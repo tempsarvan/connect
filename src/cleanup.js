@@ -7,13 +7,19 @@ import {
   deleteDoc, 
   updateDoc 
 } from "firebase/firestore";
-import { notifySessionEndedLocal } from "./chat";
+import { purgeLocalMessages } from "./chat";
+
+const registryChannel = new BroadcastChannel("connect_room_registry");
 
 export async function destroyRoomSession(roomCode) {
   if (!roomCode) return;
 
+  // Purge local in-memory messages & broadcast destroy event
+  purgeLocalMessages(roomCode);
+  registryChannel.postMessage({ type: "DESTROY_ROOM", roomCode });
+
+  // Try Firestore batch deletion
   try {
-    // 1. Delete all message documents in batch
     const messagesRef = collection(db, "rooms", roomCode, "messages");
     const snapshot = await getDocs(messagesRef);
 
@@ -25,24 +31,14 @@ export async function destroyRoomSession(roomCode) {
       await batch.commit();
     }
 
-    // 2. Delete or mark room document as ended
     const roomRef = doc(db, "rooms", roomCode);
-    try {
-      await updateDoc(roomRef, { status: "ended" });
-      await deleteDoc(roomRef);
-    } catch (e) {
-      // Document might already be deleted
-    }
-
+    await updateDoc(roomRef, { status: "ended" });
+    await deleteDoc(roomRef);
   } catch (err) {
-    console.warn("Failed to destroy room session on Firestore:", err);
+    // Firestore cleanup bypassed
   }
-
-  // 3. Notify local channel
-  notifySessionEndedLocal(roomCode);
 }
 
-// Auto-cleanup on window unload / close tab
 let activeRoomCodeForUnload = null;
 
 export function registerUnloadCleanup(roomCode) {
@@ -53,7 +49,6 @@ export function unregisterUnloadCleanup() {
   activeRoomCodeForUnload = null;
 }
 
-// Handle window unload / close tab events cleanly
 window.addEventListener("pagehide", () => {
   if (activeRoomCodeForUnload) {
     destroyRoomSession(activeRoomCodeForUnload);

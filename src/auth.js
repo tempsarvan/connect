@@ -1,34 +1,27 @@
 import { auth } from "./firebase";
-import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { signInAnonymously } from "firebase/auth";
 
-let currentUser = null;
+let currentUserUid = null;
 
 export async function initAuth() {
-  return new Promise((resolve, reject) => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        currentUser = user;
-        resolve(user);
-      } else {
-        try {
-          const userCredential = await signInAnonymously(auth);
-          currentUser = userCredential.user;
-          resolve(currentUser);
-        } catch (error) {
-          console.error("Anonymous authentication failed:", error);
-          reject(error);
-        }
-      }
-      unsubscribe();
-    });
-  });
-}
+  if (currentUserUid) return currentUserUid;
 
-export function getCurrentUser() {
-  return currentUser || auth.currentUser;
+  try {
+    const userCredential = await signInAnonymously(auth);
+    currentUserUid = userCredential.user.uid;
+    console.log("Firebase Anonymous Auth active:", currentUserUid);
+    return currentUserUid;
+  } catch (err) {
+    console.warn("Firebase Auth unavailable/fallback mode:", err.message);
+    // Generate a reliable local anonymous UID for session
+    currentUserUid = "anon_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+    return currentUserUid;
+  }
 }
 
 export function getUserUid() {
-  const user = getCurrentUser();
-  return user ? user.uid : null;
+  if (!currentUserUid) {
+    currentUserUid = "anon_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+  }
+  return currentUserUid;
 }

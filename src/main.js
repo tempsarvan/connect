@@ -29,12 +29,13 @@ let roomUnsubscribe = null;
 let chatUnsubscribe = null;
 
 async function init() {
+  // Always attach event listeners first
+  setupEventListeners();
+
   try {
-    const user = await initAuth();
-    currentUid = user.uid;
-    setupEventListeners();
+    currentUid = await initAuth();
   } catch (err) {
-    showToast("Initialization error. Refreshing...");
+    currentUid = getUserUid();
   }
 }
 
@@ -48,7 +49,7 @@ function setupEventListeners() {
     if (e.key === "Enter") handleJoinRoom();
   });
 
-  // Code input uppercase formatting
+  // Code input formatting
   inputs.code.addEventListener("input", () => {
     inputs.code.value = inputs.code.value.toUpperCase().trim();
   });
@@ -82,6 +83,8 @@ function setupEventListeners() {
 
 async function handleCreateRoom() {
   buttons.create.disabled = true;
+  if (!currentUid) currentUid = getUserUid();
+
   const roomCode = generateRoomCode();
   
   try {
@@ -92,18 +95,22 @@ async function handleCreateRoom() {
     displays.roomCode.textContent = roomCode;
     showView("waiting");
 
-    // Listen for peer joining
+    // Listen for room updates (e.g. peer joining or session end)
+    if (roomUnsubscribe) roomUnsubscribe();
     roomUnsubscribe = listenToRoom(roomCode, (roomData) => {
       if (!roomData || roomData.status === "ended") {
-        if (views.chat.classList.contains("active")) {
+        if (views.chat.classList.contains("active") || views.waiting.classList.contains("active")) {
           onSessionEnded();
         }
       } else if (roomData.status === "active" && roomData.members.length >= 2) {
-        startChatSession();
+        if (!views.chat.classList.contains("active")) {
+          startChatSession();
+        }
       }
     });
   } catch (err) {
     showToast(err.message || "Failed to create room.");
+  } finally {
     buttons.create.disabled = false;
   }
 }
@@ -116,13 +123,16 @@ async function handleJoinRoom() {
   }
 
   buttons.join.disabled = true;
+  if (!currentUid) currentUid = getUserUid();
+
   try {
-    await joinRoom(code, currentUid);
+    const roomData = await joinRoom(code, currentUid);
     currentRoomCode = code;
     registerUnloadCleanup(currentRoomCode);
     startChatSession();
   } catch (err) {
     showToast(err.message || "Could not join room.");
+  } finally {
     buttons.join.disabled = false;
   }
 }
@@ -130,9 +140,9 @@ async function handleJoinRoom() {
 function startChatSession() {
   displays.chatRoomCode.textContent = currentRoomCode;
   showView("chat");
-  inputs.message.focus();
+  setTimeout(() => inputs.message.focus(), 100);
 
-  // Listen to messages
+  // Listen to chat messages
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
     renderMessages(messages, currentUid);
@@ -210,5 +220,5 @@ function resetAppState() {
   showView("landing");
 }
 
-// Start app
+// Start application
 init();

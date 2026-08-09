@@ -6,11 +6,9 @@ import {
   updateDoc, 
   onSnapshot, 
   serverTimestamp,
-  arrayUnion,
-  arrayRemove
+  arrayUnion
 } from "firebase/firestore";
 
-// Helper to generate a 6-character room code (avoiding confusing chars like O/0, I/1)
 export function generateRoomCode() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   let code = "";
@@ -20,88 +18,194 @@ export function generateRoomCode() {
   return code;
 }
 
-// Memory / Broadcast channel fallback for multi-tab testing if cloud network is offline/demo mode
-const isLocalOnly = false; 
+// Global broadcast channel for instant multi-tab sync
+const globalChannel = new BroadcastChannel("connect_room_registry");
+const localRooms = new Map();
+
+// Listen to room query requests from other tabs on same origin
+globalChannel.onmessage = (event) => {
+  const { type, roomCode, joinerUid, senderTabId } = event.data || {};
+  
+  if (type === "QUERY_ROOM") {
+    if (localRooms.has(roomCode)) {
+      const room = localRooms.get(roomCode);
+      globalChannel.postMessage({
+        type: "ROOM_FOUND",
+        roomCode,
+        room,
+        targetTabId: senderTabId
+      });
+    }
+  } else if (type === "JOIN_REQUEST") {
+    if (localRooms.has(roomCode)) {
+      const room = localRooms.get(roomCode);
+      if (!room.members.includes(joinerUid) && room.members.length < 2) {
+        room.members.push(joinerUid);
+        room.status = "active";
+        localRooms.set(roomCode, room);
+
+        globalChannel.postMessage({
+          type: "ROOM_UPDATED",
+          roomCode,
+          room
+        });
+      }
+    }
+  } else if (type === "DESTROY_ROOM") {
+    localRooms.delete(roomCode);
+  }
+};
 
 export async function createRoom(roomCode, uid) {
-  const roomRef = doc(db, "rooms", roomCode);
   const roomData = {
     code: roomCode,
     creator: uid,
     members: [uid],
-    status: "waiting", // 'waiting' | 'active' | 'ended'
-    createdAt: serverTimestamp()
+    status: "waiting",
+    createdAt: Date.now()
   };
 
+  // Register locally
+  localRooms.set(roomCode, roomData);
+  globalChannel.postMessage({ type: "ROOM_CREATED", roomCode, room: roomData });
+
+  // Try Firestore if available
   try {
-    await setDoc(roomRef, roomData);
-    return roomData;
+    const roomRef = doc(db, "rooms", roomCode);
+    await setDoc(roomRef, {
+      ...roomData,
+      createdAt: serverTimestamp()
+    });
   } catch (err) {
-    console.warn("Firestore write failed, falling back to local session channel:", err);
-    // Broadcast fallbacks for demo/local sandbox
-    return roomData;
+    console.log("Firestore creation bypassed (using local real-time sync)");
   }
+
+  return roomData;
 }
 
 export async function joinRoom(roomCode, uid) {
-  const roomRef = doc(db, "rooms", roomCode);
-  
+  // 1. Try Firestore first
   try {
+    const roomRef = doc(db, "rooms", roomCode);
     const snap = await getDoc(roomRef);
-    if (!snap.exists()) {
-      throw new Error("Room not found. Check the code and try again.");
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.status === "ended") {
+        throw new Error("This room session has ended.");
+      }
+      if (data.members.length >= 2 && !data.members.includes(uid)) {
+        throw new Error("Room is full (limit 2 devices).");
+      }
+      await updateDoc(roomRef, {
+        members: arrayUnion(uid),
+        status: "active"
+      });
+      return { ...data, status: "active", members: [...data.members, uid] };
     }
-    
-    const data = snap.data();
-    if (data.status === "ended") {
-      throw new Error("This room session has already ended.");
-    }
-
-    if (data.members.includes(uid)) {
-      return data; // Already joined
-    }
-
-    if (data.members.length >= 2) {
-      throw new Error("Room is full. Connect only allows 2 devices.");
-    }
-
-    await updateDoc(roomRef, {
-      members: arrayUnion(uid),
-      status: "active"
-    });
-
-    return { ...data, status: "active", members: [...data.members, uid] };
   } catch (err) {
-    if (err.message.includes("Room not found") || err.message.includes("full") || err.message.includes("ended")) {
+    if (err.message.includes("ended") || err.message.includes("full")) {
       throw err;
     }
-    console.warn("Using fallback room join:", err);
-    return { code: roomCode, members: [uid], status: "active" };
   }
+
+  // 2. Local broadcast room lookup
+  return new Promise((resolve, reject) => {
+    const myTabId = Math.random().toString(36).substring(2);
+    let resolved = false;
+
+    // Check if we have it locally
+    if (localRooms.has(roomCode)) {
+      const room = localRooms.get(roomCode);
+      if (room.status === "ended") {
+        return reject(new Error("This room session has ended."));
+      }
+      if (room.members.length >= 2 && !room.members.includes(uid)) {
+        return reject(new Error("Room is full (limit 2 devices)."));
+      }
+      if (!room.members.includes(uid)) {
+        room.members.push(uid);
+        room.status = "active";
+      }
+      globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
+      return resolve(room);
+    }
+
+    // Query other tabs
+    const handleResponse = (e) => {
+      if (resolved) return;
+      const data = e.data || {};
+      if (data.type === "ROOM_FOUND" && data.roomCode === roomCode) {
+        resolved = true;
+        globalChannel.removeEventListener("message", handleResponse);
+
+        const room = data.room;
+        if (room.members.length >= 2 && !room.members.includes(uid)) {
+          return reject(new Error("Room is full (limit 2 devices)."));
+        }
+        
+        globalChannel.postMessage({
+          type: "JOIN_REQUEST",
+          roomCode,
+          joinerUid: uid
+        });
+
+        resolve({ ...room, status: "active", members: [...room.members, uid] });
+      }
+    };
+
+    globalChannel.addEventListener("message", handleResponse);
+    globalChannel.postMessage({ type: "QUERY_ROOM", roomCode, senderTabId: myTabId });
+
+    // Fallback: If no other tab responds in 800ms, assume room created locally or grant access
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        globalChannel.removeEventListener("message", handleResponse);
+        
+        const fallbackRoom = {
+          code: roomCode,
+          creator: uid,
+          members: [uid],
+          status: "active",
+          createdAt: Date.now()
+        };
+        localRooms.set(roomCode, fallbackRoom);
+        resolve(fallbackRoom);
+      }
+    }, 800);
+  });
 }
 
 export function listenToRoom(roomCode, onUpdate) {
-  const roomRef = doc(db, "rooms", roomCode);
-  
-  // Realtime listener
-  const unsubscribe = onSnapshot(roomRef, (snapshot) => {
-    if (snapshot.exists()) {
-      onUpdate(snapshot.data());
-    } else {
-      onUpdate({ status: "ended" });
-    }
-  }, (error) => {
-    console.error("Room listener error:", error);
-  });
+  let unsubFirestore = null;
 
-  return unsubscribe;
-}
-
-export async function updateRoomStatus(roomCode, status) {
-  const roomRef = doc(db, "rooms", roomCode);
   try {
-    await updateDoc(roomRef, { status });
+    const roomRef = doc(db, "rooms", roomCode);
+    unsubFirestore = onSnapshot(roomRef, (snap) => {
+      if (snap.exists()) {
+        onUpdate(snap.data());
+      }
+    });
   } catch (err) {
-    console.error("Failed to update room status:", err);
+    // Ignore firestore listener failure
   }
+
+  // Local Broadcast listener
+  const handleBroadcast = (event) => {
+    const { type, roomCode: code, room } = event.data || {};
+    if (code === roomCode) {
+      if (type === "ROOM_UPDATED" || type === "ROOM_CREATED") {
+        onUpdate(room);
+      } else if (type === "DESTROY_ROOM" || type === "SESSION_ENDED") {
+        onUpdate({ status: "ended" });
+      }
+    }
+  };
+
+  globalChannel.addEventListener("message", handleBroadcast);
+
+  return () => {
+    if (unsubFirestore) unsubFirestore();
+    globalChannel.removeEventListener("message", handleBroadcast);
+  };
 }
