@@ -263,6 +263,18 @@ function updateFriendsUI() {
 }
 
 function setupEventListeners() {
+  // Upward Expanding Tools Menu Toggle
+  buttons.toolsMenuToggle?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    displays.dropdownToolsMenu.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!displays.dropdownToolsMenu.contains(e.target) && e.target !== buttons.toolsMenuToggle) {
+      displays.dropdownToolsMenu.classList.add("hidden");
+    }
+  });
+
   // Navigation & Landing Page Auth
   buttons.navLogin.addEventListener("click", () => {
     if (hasValidSession()) enterConnectApp();
@@ -410,8 +422,14 @@ function setupEventListeners() {
   });
 
   // File Upload Handlers
-  inputs.fileUpload.addEventListener("change", (e) => handleFileUpload(e, currentRoomCode));
-  inputs.photoUpload.addEventListener("change", (e) => handlePhotoUpload(e, currentRoomCode));
+  inputs.fileUpload.addEventListener("change", (e) => {
+    displays.dropdownToolsMenu.classList.add("hidden");
+    handleFileUpload(e, currentRoomCode);
+  });
+  inputs.photoUpload.addEventListener("change", (e) => {
+    displays.dropdownToolsMenu.classList.add("hidden");
+    handlePhotoUpload(e, currentRoomCode);
+  });
 
   buttons.closeLightbox.addEventListener("click", closeLightbox);
 }

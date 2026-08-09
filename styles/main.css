@@ -516,6 +516,96 @@
   color: var(--text-dim);
 }
 
+/* UPWARD-EXPANDING EXPRESSION TOOLS MENU */
+.tools-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-tools-toggle {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.btn-tools-toggle:hover {
+  background: var(--surface-hover);
+  transform: scale(1.06);
+}
+
+.tools-dropdown-menu {
+  position: absolute;
+  bottom: 56px;
+  left: 0;
+  width: 250px;
+  background: rgba(18, 18, 24, 0.95);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85), 0 0 20px rgba(59, 130, 246, 0.15);
+  z-index: 150;
+  animation: slideUp 200ms ease-out forwards;
+}
+
+.tools-dropdown-menu.hidden {
+  display: none;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tools-dropdown-header {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 6px 8px 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.tools-dropdown-item {
+  height: 42px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.tools-dropdown-item:hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: #ffffff;
+}
+
 /* Modals & Full-Screen Overlays */
 .auth-modal {
   position: fixed;
@@ -979,84 +1069,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Saved History Vault Drawer */
-.popover-saved {
-  width: 350px;
-  max-height: 380px;
-}
-
-.saved-vault-list {
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  max-height: 320px;
-  padding: var(--space-xs);
-  gap: 8px;
-}
-
-.saved-vault-item {
-  padding: var(--space-sm) var(--space-md);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  position: relative;
-}
-
-.saved-vault-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.73rem;
-  color: var(--text-dim);
-}
-
-.saved-vault-text {
-  font-size: 0.85rem;
-  color: var(--text);
-  word-break: break-word;
-}
-
-.saved-vault-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 2px;
-}
-
-.btn-send-vault {
-  height: 28px;
-  padding: 0 10px;
-  background: var(--surface-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  color: #ffffff;
-  font-size: 0.74rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
-}
-
-.btn-send-vault:hover {
-  background: #ffffff;
-  color: #000000;
-}
-
-.btn-remove-saved {
-  font-size: 0.7rem;
-  color: var(--danger);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 2px 4px;
 }
 
 /* Sender Name Badge Above Bubbles */
@@ -1542,12 +1554,6 @@
   align-items: center;
   position: relative;
   z-index: 20;
-}
-
-.media-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
 }
 
 .lightbox-modal {

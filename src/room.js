@@ -20,7 +20,7 @@ export function generateRoomCode() {
 
 const globalChannel = new BroadcastChannel("connect_room_registry");
 const localRooms = new Map();
-const localRoomListeners = new Map(); // roomCode -> Set of listener functions
+const localRoomListeners = new Map();
 
 function notifyRoomListeners(roomCode, roomData) {
   const listeners = localRoomListeners.get(roomCode);
@@ -29,7 +29,20 @@ function notifyRoomListeners(roomCode, roomData) {
   }
 }
 
-// Listen to room events across tabs on same origin & localStorage sync
+// Window Storage Event & BroadcastChannel for cross-tab & cross-device local sync
+window.addEventListener("storage", (e) => {
+  if (e.key && e.key.startsWith("connect_room_state_")) {
+    const roomCode = e.key.replace("connect_room_state_", "");
+    try {
+      const roomData = JSON.parse(e.newValue);
+      if (roomData) {
+        localRooms.set(roomCode, roomData);
+        notifyRoomListeners(roomCode, roomData);
+      }
+    } catch (err) {}
+  }
+});
+
 globalChannel.onmessage = (event) => {
   const { type, roomCode, joinerUid, room } = event.data || {};
   
@@ -45,15 +58,14 @@ globalChannel.onmessage = (event) => {
   } else if (type === "JOIN_REQUEST") {
     if (localRooms.has(roomCode)) {
       const room = localRooms.get(roomCode);
-      if (!room.members.includes(joinerUid) && room.members.length < 2) {
+      if (!room.members.includes(joinerUid)) {
         room.members.push(joinerUid);
         room.status = "active";
         localRooms.set(roomCode, room);
 
-        // Notify local listeners (Host tab!)
+        localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
         notifyRoomListeners(roomCode, room);
 
-        // Broadcast to joiner tab
         globalChannel.postMessage({
           type: "ROOM_UPDATED",
           roomCode,
@@ -64,10 +76,12 @@ globalChannel.onmessage = (event) => {
   } else if (type === "ROOM_UPDATED" || type === "ROOM_CREATED") {
     if (room) {
       localRooms.set(roomCode, room);
+      localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
       notifyRoomListeners(roomCode, room);
     }
   } else if (type === "DESTROY_ROOM" || type === "SESSION_ENDED") {
     localRooms.delete(roomCode);
+    localStorage.removeItem(`connect_room_state_${roomCode}`);
     notifyRoomListeners(roomCode, { status: "ended" });
   }
 };
@@ -82,13 +96,16 @@ export async function createRoom(roomCode, uid) {
   };
 
   localRooms.set(roomCode, roomData);
+  localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(roomData));
   globalChannel.postMessage({ type: "ROOM_CREATED", roomCode, room: roomData });
 
   if (isConfigured) {
-    withTimeout(setDoc(doc(db, "rooms", roomCode), {
-      ...roomData,
-      createdAt: serverTimestamp()
-    })).catch(() => {});
+    try {
+      await withTimeout(setDoc(doc(db, "rooms", roomCode), {
+        ...roomData,
+        createdAt: serverTimestamp()
+      }), 1500);
+    } catch (err) {}
   }
 
   return roomData;
@@ -99,20 +116,26 @@ export async function joinRoom(roomCode, uid) {
   if (isConfigured) {
     try {
       const roomRef = doc(db, "rooms", roomCode);
-      const snap = await withTimeout(getDoc(roomRef), 1000);
+      const snap = await withTimeout(getDoc(roomRef), 1200);
       if (snap.exists()) {
         const data = snap.data();
         if (data.status === "ended") {
           throw new Error("This room session has ended.");
         }
-        if (data.members.length >= 2 && !data.members.includes(uid)) {
-          throw new Error("Room is full (limit 2 devices).");
-        }
+        
+        const updatedMembers = Array.from(new Set([...(data.members || []), uid]));
+        const updatedRoom = { ...data, status: "active", members: updatedMembers };
+
         await withTimeout(updateDoc(roomRef, {
           members: arrayUnion(uid),
           status: "active"
-        }), 1000);
-        return { ...data, status: "active", members: [...data.members, uid] };
+        }), 1200);
+
+        localRooms.set(roomCode, updatedRoom);
+        localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(updatedRoom));
+        notifyRoomListeners(roomCode, updatedRoom);
+
+        return updatedRoom;
       }
     } catch (err) {
       if (err.message.includes("ended") || err.message.includes("full")) {
@@ -121,77 +144,37 @@ export async function joinRoom(roomCode, uid) {
     }
   }
 
-  // 2. Local BroadcastChannel + LocalStorage multi-tab lookup
-  return new Promise((resolve, reject) => {
-    let resolved = false;
-
-    // Check if room exists in localRooms map (Host is on same tab / instance)
-    if (localRooms.has(roomCode)) {
-      const room = localRooms.get(roomCode);
-      if (room.status === "ended") {
-        return reject(new Error("This room session has ended."));
-      }
-      if (room.members.length >= 2 && !room.members.includes(uid)) {
-        return reject(new Error("Room is full (limit 2 devices)."));
-      }
-      if (!room.members.includes(uid)) {
-        room.members.push(uid);
-        room.status = "active";
-      }
-      localRooms.set(roomCode, room);
-      notifyRoomListeners(roomCode, room);
-      globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
-      return resolve(room);
+  // 2. Local & Storage fallback
+  let room = localRooms.get(roomCode);
+  if (!room) {
+    const stored = localStorage.getItem(`connect_room_state_${roomCode}`);
+    if (stored) {
+      try { room = JSON.parse(stored); } catch (e) {}
     }
+  }
 
-    // Query other tabs on same origin
-    const handleResponse = (e) => {
-      if (resolved) return;
-      const data = e.data || {};
-      if (data.type === "ROOM_FOUND" && data.roomCode === roomCode) {
-        resolved = true;
-        globalChannel.removeEventListener("message", handleResponse);
-
-        const room = data.room;
-        if (room.members.length >= 2 && !room.members.includes(uid)) {
-          return reject(new Error("Room is full (limit 2 devices)."));
-        }
-        
-        globalChannel.postMessage({
-          type: "JOIN_REQUEST",
-          roomCode,
-          joinerUid: uid
-        });
-
-        const activeRoom = { ...room, status: "active", members: [...room.members, uid] };
-        localRooms.set(roomCode, activeRoom);
-        notifyRoomListeners(roomCode, activeRoom);
-        resolve(activeRoom);
-      }
+  if (!room) {
+    room = {
+      code: roomCode,
+      creator: uid,
+      members: [uid],
+      status: "active",
+      createdAt: Date.now()
     };
+  } else {
+    if (!room.members.includes(uid)) {
+      room.members.push(uid);
+    }
+    room.status = "active";
+  }
 
-    globalChannel.addEventListener("message", handleResponse);
-    globalChannel.postMessage({ type: "QUERY_ROOM", roomCode });
+  localRooms.set(roomCode, room);
+  localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
+  notifyRoomListeners(roomCode, room);
 
-    // Fallback if host is on different origin/network or tab didn't answer in 300ms
-    setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        globalChannel.removeEventListener("message", handleResponse);
-        
-        const activeRoom = {
-          code: roomCode,
-          creator: uid,
-          members: [uid],
-          status: "active",
-          createdAt: Date.now()
-        };
-        localRooms.set(roomCode, activeRoom);
-        notifyRoomListeners(roomCode, activeRoom);
-        resolve(activeRoom);
-      }
-    }, 300);
-  });
+  globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
+
+  return room;
 }
 
 export function listenToRoom(roomCode, onUpdate) {
@@ -200,9 +183,17 @@ export function listenToRoom(roomCode, onUpdate) {
   }
   localRoomListeners.get(roomCode).add(onUpdate);
 
-  // Trigger immediate callback if room state is already known
   if (localRooms.has(roomCode)) {
     onUpdate(localRooms.get(roomCode));
+  } else {
+    const stored = localStorage.getItem(`connect_room_state_${roomCode}`);
+    if (stored) {
+      try {
+        const roomData = JSON.parse(stored);
+        localRooms.set(roomCode, roomData);
+        onUpdate(roomData);
+      } catch (err) {}
+    }
   }
 
   let unsubFirestore = null;
@@ -213,6 +204,7 @@ export function listenToRoom(roomCode, onUpdate) {
         if (snap.exists()) {
           const data = snap.data();
           localRooms.set(roomCode, data);
+          localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(data));
           onUpdate(data);
         }
       });
