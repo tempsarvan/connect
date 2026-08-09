@@ -57,7 +57,12 @@ export function getSavedVaultMessages() {
 
 export function saveMessageToVault(msg) {
   if (!savedVaultMessages.some((m) => m.id === msg.id)) {
-    savedVaultMessages.push(msg);
+    const fullDate = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    const vaultItem = {
+      ...msg,
+      vaultSavedAt: fullDate
+    };
+    savedVaultMessages.unshift(vaultItem);
     localStorage.setItem("connect_saved_vault", JSON.stringify(savedVaultMessages));
   }
 }
@@ -104,6 +109,7 @@ export async function sendMessage(roomCode, uid, payload) {
   const fileName = typeof payload === "object" ? payload.fileName || null : null;
   const fileSize = typeof payload === "object" ? payload.fileSize || null : null;
   const soundFx = typeof payload === "object" ? payload.soundFx || null : null;
+  const vaultMemoryOrigin = typeof payload === "object" ? payload.vaultMemoryOrigin || null : null;
   const senderName = getUsername();
 
   if (!text.trim() && !mediaUrl && !soundFx) return;
@@ -123,6 +129,7 @@ export async function sendMessage(roomCode, uid, payload) {
     fileName,
     fileSize,
     soundFx,
+    vaultMemoryOrigin,
     reactions: {},
     localTime: timeStr,
     timestamp: Date.now(),
@@ -155,6 +162,7 @@ export async function sendMessage(roomCode, uid, payload) {
       fileName,
       fileSize,
       soundFx,
+      vaultMemoryOrigin,
       reactions: {},
       localTime: timeStr,
       timestamp: serverTimestamp()
@@ -274,6 +282,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
                 fileName: data.fileName || null,
                 fileSize: data.fileSize || null,
                 soundFx: data.soundFx || null,
+                vaultMemoryOrigin: data.vaultMemoryOrigin || null,
                 reactions: data.reactions || {},
                 localTime: timeStr,
                 timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()

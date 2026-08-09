@@ -162,7 +162,7 @@ export function hideReplyPreview() {
   displays.replyPreviewText.textContent = "";
 }
 
-export function renderSavedVault(savedMessages, onRemoveSaved) {
+export function renderSavedVault(savedMessages, onRemoveSaved, onSendFromVault) {
   displays.savedVaultList.innerHTML = "";
   if (savedMessages.length === 0) {
     displays.savedVaultList.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.8rem;">No saved vault messages yet</div>`;
@@ -172,13 +172,29 @@ export function renderSavedVault(savedMessages, onRemoveSaved) {
   savedMessages.forEach((msg) => {
     const item = document.createElement("div");
     item.className = "saved-vault-item";
+    
+    let contentPreview = msg.text;
+    if (msg.mediaType === 'image') contentPreview = '[Photo Attachment]';
+    else if (msg.mediaType === 'audio') contentPreview = '[Voice Note]';
+    else if (msg.mediaType === 'gif') contentPreview = '[Animated GIF]';
+    else if (msg.mediaType === 'sticker') contentPreview = '[Sticker]';
+    else if (msg.mediaType === 'file') contentPreview = `[Document: ${msg.fileName || ''}]`;
+
     item.innerHTML = `
       <div class="saved-vault-header">
-        <span>${msg.senderName || 'Peer'} • ${msg.localTime || ''}</span>
+        <span>By ${msg.senderName || 'Peer'} • ${msg.vaultSavedAt || msg.localTime || ''}</span>
+      </div>
+      <div class="saved-vault-text">${contentPreview}</div>
+      <div class="saved-vault-actions">
+        <button class="btn-send-vault">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <span>Send into Chat</span>
+        </button>
         <button class="btn-remove-saved">Remove ✕</button>
       </div>
-      <div class="saved-vault-text">${msg.text || (msg.mediaType === 'image' ? '[Photo]' : msg.mediaType === 'audio' ? '[Voice Note]' : '[Media]')}</div>
     `;
+
+    item.querySelector(".btn-send-vault").onclick = () => onSendFromVault(msg);
     item.querySelector(".btn-remove-saved").onclick = () => onRemoveSaved(msg.id);
     displays.savedVaultList.appendChild(item);
   });
@@ -488,6 +504,17 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
     bubble.onclick = () => onMessageClick(msg);
+
+    // Display Vault Memory Origin Badge if sent from Vault
+    if (msg.vaultMemoryOrigin) {
+      const vBadge = document.createElement("div");
+      vBadge.className = "msg-vault-origin";
+      vBadge.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <span>Vault Memory • Originally saved on ${msg.vaultMemoryOrigin}</span>
+      `;
+      bubble.appendChild(vBadge);
+    }
 
     if (msg.mediaType === "sound_fx") {
       const card = document.createElement("div");

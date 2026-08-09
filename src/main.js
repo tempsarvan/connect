@@ -108,6 +108,26 @@ function updateProfileUI() {
   displays.chatHeaderUsername.textContent = uname;
 }
 
+function handleSendFromVault(vaultMsg) {
+  if (!currentRoomCode) {
+    showToast("Join or create a room to send Vault items");
+    return;
+  }
+
+  displays.popoverSaved.classList.add("hidden");
+  
+  sendMessage(currentRoomCode, currentUid, {
+    text: vaultMsg.text || "",
+    mediaType: vaultMsg.mediaType || "text",
+    mediaUrl: vaultMsg.mediaUrl || null,
+    fileName: vaultMsg.fileName || null,
+    fileSize: vaultMsg.fileSize || null,
+    vaultMemoryOrigin: vaultMsg.vaultSavedAt || vaultMsg.localTime || "Past Session"
+  });
+
+  showToast("Vault Memory dropped into chat");
+}
+
 function setupEventListeners() {
   // First-Time Onboarding Completion
   buttons.completeSetup.addEventListener("click", () => {
@@ -194,11 +214,15 @@ function setupEventListeners() {
   buttons.toggleSaved.addEventListener("click", () => {
     closeAllPopovers();
     const vault = getSavedVaultMessages();
-    renderSavedVault(vault, (msgId) => {
-      const updated = removeSavedMessageFromVault(msgId);
-      renderSavedVault(updated, (id) => removeSavedMessageFromVault(id));
-      showToast("Removed from Vault");
-    });
+    renderSavedVault(
+      vault,
+      (msgId) => {
+        const updated = removeSavedMessageFromVault(msgId);
+        renderSavedVault(updated, (id) => removeSavedMessageFromVault(id), handleSendFromVault);
+        showToast("Removed from Vault");
+      },
+      handleSendFromVault
+    );
     displays.popoverSaved.classList.toggle("hidden");
   });
 

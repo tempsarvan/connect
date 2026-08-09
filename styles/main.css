@@ -90,7 +90,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  color: var(--text);
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 
@@ -312,7 +312,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.8rem;
+  color: var(--text);
 }
 
 .profile-input-label {
@@ -339,27 +339,27 @@
 
 /* Saved History Vault Drawer */
 .popover-saved {
-  width: 340px;
-  max-height: 360px;
+  width: 350px;
+  max-height: 380px;
 }
 
 .saved-vault-list {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: 300px;
+  max-height: 320px;
   padding: var(--space-xs);
+  gap: 8px;
 }
 
 .saved-vault-item {
   padding: var(--space-sm) var(--space-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  margin-bottom: var(--space-xs);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   position: relative;
 }
 
@@ -367,7 +367,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.75rem;
+  font-size: 0.73rem;
   color: var(--text-dim);
 }
 
@@ -377,6 +377,34 @@
   word-break: break-word;
 }
 
+.saved-vault-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.btn-send-vault {
+  height: 28px;
+  padding: 0 10px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+}
+
+.btn-send-vault:hover {
+  background: #ffffff;
+  color: #000000;
+}
+
 .btn-remove-saved {
   font-size: 0.7rem;
   color: var(--danger);
@@ -384,6 +412,20 @@
   border: none;
   cursor: pointer;
   padding: 2px 4px;
+}
+
+/* Vault Memory Origin Badge Inside Chat Bubbles */
+.msg-vault-origin {
+  font-size: 0.72rem;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border-left: 2px solid #f59e0b;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Message Context Menu Dropdown Modal */
