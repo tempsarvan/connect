@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="Connect — Ephemeral private messaging & calls. No traces.">
-  <title>Connect</title>
+  <title>Connect — Private Ephemeral Suite</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles/reset.css">
   <link rel="stylesheet" href="/styles/tokens.css">
   <link rel="stylesheet" href="/styles/main.css">
@@ -15,6 +15,147 @@
 </head>
 <body>
   <div id="app">
+
+    <!-- Showcase Product Landing Page & Interactive Tour View -->
+    <section id="view-showcase" class="view active">
+      <canvas id="three-bg-canvas" class="three-bg-canvas"></canvas>
+      
+      <header class="showcase-nav">
+        <div class="showcase-logo">
+          <span class="logo-dot"></span>
+          <span class="logo-text">connect</span>
+        </div>
+        <div class="showcase-nav-links">
+          <button id="btn-nav-tour" class="showcase-link-btn">Product Tour</button>
+          <button id="btn-nav-features" class="showcase-link-btn">Features</button>
+          <button id="btn-nav-enter-top" class="btn btn-primary showcase-cta-sm">Enter Connect ➔</button>
+        </div>
+      </header>
+
+      <div class="showcase-scroll-container">
+        <!-- Hero Section -->
+        <div class="showcase-hero">
+          <div class="hero-badge">
+            <span class="badge-spark">✦</span>
+            <span>ZERO-TRACE EPHEMERAL COMMUNICATION</span>
+          </div>
+          
+          <h1 class="hero-title">Talk freely.<br>Leave no trace.</h1>
+          
+          <p class="hero-subtitle">
+            Connect is a next-generation zero-trace communications suite. Express yourself with live soundboard audio, doodle sketches, encrypted vault memory, and instant ephemeral rooms.
+          </p>
+
+          <div class="hero-cta-group">
+            <button id="btn-enter-app-hero" class="btn btn-primary hero-btn-lg">
+              <span>Enter Connect</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+            <button id="btn-start-tour-scroll" class="btn btn-secondary hero-btn-lg">Explore Tour ↓</button>
+          </div>
+        </div>
+
+        <!-- Product Tour Section -->
+        <section id="section-tour-details" class="showcase-section">
+          <div class="section-header">
+            <span class="section-tag">GUIDED TOUR</span>
+            <h2 class="section-title">Designed for Expressive Ephemeral Connection</h2>
+            <p class="section-desc">Discover the core innovations that make Connect feel human, ultra-private, and state-of-the-art.</p>
+          </div>
+
+          <div class="tour-cards-grid">
+            <!-- Card 1 -->
+            <div class="tour-card">
+              <div class="tour-card-icon">🔒</div>
+              <h3 class="tour-card-title">End-to-End Ephemeral Rooms</h3>
+              <p class="tour-card-desc">Generate simple 6-digit room codes. The moment a session ends or tabs close, every single message, voice note, and key is permanently wiped clean.</p>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="tour-card">
+              <div class="tour-card-icon">📌</div>
+              <h3 class="tour-card-title">Persistent Vault Memory</h3>
+              <p class="tour-card-desc">Selectively save photos, text, or hand-drawn sketches into your personal vault memory across sessions. Drop them into future room sessions with original timestamp origin badges.</p>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="tour-card">
+              <div class="tour-card-icon">🔊</div>
+              <h3 class="tour-card-title">Live Soundboard FX</h3>
+              <p class="tour-card-desc">Trigger real-time spatial soundboard audio effects (Applause, Airhorn, Cheer, Laser) that travel synchronously to connected peers.</p>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="tour-card">
+              <div class="tour-card-icon">🎨</div>
+              <h3 class="tour-card-title">Doodle Studio Canvas</h3>
+              <p class="tour-card-desc">Sketch ideas in real-time on a digital doodle canvas with custom color palettes and send sketches instantly into the chat stream.</p>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="tour-card">
+              <div class="tour-card-icon">✍️</div>
+              <h3 class="tour-card-title">Drafting Wave Indicators</h3>
+              <p class="tour-card-desc">Real-time 3-dot typing wave animations inform peers when an incomplete message is being drafted before sending.</p>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="tour-card">
+              <div class="tour-card-icon">⚙️</div>
+              <h3 class="tour-card-title">Full-Screen System Controls</h3>
+              <p class="tour-card-desc">Full-screen settings modal with iOS-style UI switches for shared Vault Memory toggles, sound chimes, and personalized credentials.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Interactive Tour Sandbox Demo -->
+        <section id="section-tour-sandbox" class="showcase-section">
+          <div class="section-header">
+            <span class="section-tag">INTERACTIVE PLAYGROUND</span>
+            <h2 class="section-title">Try Feature Demos Right Now</h2>
+            <p class="section-desc">Click below to test live sound FX, spoiler blur, and vault memory banners.</p>
+          </div>
+
+          <div class="sandbox-widget-card">
+            <div class="sandbox-header">
+              <span>Interactive Feature Sandbox</span>
+            </div>
+            
+            <div class="sandbox-controls">
+              <button id="btn-sandbox-sound" class="sandbox-demo-btn">
+                <span>🔊 Play Airhorn FX</span>
+              </button>
+              <button id="btn-sandbox-vault" class="sandbox-demo-btn">
+                <span>📌 Preview Vault Archive Banner</span>
+              </button>
+              <button id="btn-sandbox-confetti" class="sandbox-demo-btn">
+                <span>🎉 Trigger Confetti Burst</span>
+              </button>
+            </div>
+
+            <div id="sandbox-preview-output" class="sandbox-preview-output">
+              <div class="sandbox-placeholder">Tap a button above to test live interactive features!</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Final Call-to-Action Card -->
+        <section class="showcase-final-cta">
+          <div class="final-cta-card">
+            <h2>Ready to experience Connect?</h2>
+            <p>No account registration required. Set a username, create a room code, and start expressing yourself.</p>
+            <button id="btn-enter-connect-final" class="btn btn-primary final-enter-btn">
+              <span>ENTER CONNECT NOW</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <footer class="showcase-footer">
+          <p>© 2026 Connect. Ephemeral Zero-Trace Communication Suite.</p>
+        </footer>
+      </div>
+    </section>
 
     <!-- First-Time Onboarding Profile Setup View -->
     <section id="view-setup" class="view">
@@ -58,7 +199,7 @@
     </section>
 
     <!-- Landing View -->
-    <section id="view-landing" class="view active">
+    <section id="view-landing" class="view">
       <!-- Top-Right Settings Gear Button -->
       <button id="btn-gear-landing" class="btn-settings-gear" title="Settings & Preferences">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -61,6 +61,7 @@ import {
   showWipModal,
   hideWipModal
 } from "./ui";
+import { initThreeShowcase } from "./showcase3d";
 
 let currentRoomCode = null;
 let currentUid = null;
@@ -83,13 +84,13 @@ async function init() {
     currentUid = getUserUid();
   }
 
-  // Force First-Time Profile Onboarding Setup
-  if (!hasCompletedSetup()) {
-    showView("setup");
-  } else {
-    updateProfileUI();
-    showView("landing");
+  // Initialize Three.js 3D Background Canvas
+  if (displays.threeBgCanvas) {
+    initThreeShowcase(displays.threeBgCanvas);
   }
+
+  // Always show Showcase Product Landing Page first
+  showView("showcase");
 
   initMediaPopovers(handleSendGif, handleSendSticker);
   initEmojiPanel(handleSelectEmoji);
@@ -98,6 +99,15 @@ async function init() {
   listenToNotifications((notifs, unread) => {
     renderNotifications(notifs, unread);
   });
+}
+
+function enterConnectApp() {
+  if (!hasCompletedSetup()) {
+    showView("setup");
+  } else {
+    updateProfileUI();
+    showView("landing");
+  }
 }
 
 function updateProfileUI() {
@@ -166,6 +176,56 @@ function handleSendFromVault(vaultMsg) {
 }
 
 function setupEventListeners() {
+  // Showcase Landing Page Navigation & CTAs
+  buttons.navTour.addEventListener("click", () => {
+    document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  buttons.startTourScroll.addEventListener("click", () => {
+    document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  buttons.navFeatures.addEventListener("click", () => {
+    document.getElementById("section-tour-sandbox")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  buttons.navEnterTop.addEventListener("click", enterConnectApp);
+  buttons.enterAppHero.addEventListener("click", enterConnectApp);
+  buttons.enterConnectFinal.addEventListener("click", enterConnectApp);
+
+  // Showcase Interactive Tour Sandbox Demos
+  buttons.sandboxSound.addEventListener("click", () => {
+    soundEngine.playSoundFX("airhorn");
+    displays.sandboxPreviewOutput.innerHTML = `
+      <div style="color: #60a5fa; font-weight: 600; text-align: center;">
+        🔊 Airhorn Sound FX played synchronously across session!
+      </div>
+    `;
+  });
+
+  buttons.sandboxVault.addEventListener("click", () => {
+    const timeStr = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    displays.sandboxPreviewOutput.innerHTML = `
+      <div class="msg-vault-archive-box" style="width:100%; margin:0;">
+        <div class="msg-vault-archive-header">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <span>Vault Archive Memory</span>
+        </div>
+        <div class="msg-vault-archive-desc">Retrieved from Vault Memory saved on ${timeStr}</div>
+        <div style="margin-top:4px; font-size:0.85rem; color:#ffffff;">"This item was selectively archived across sessions."</div>
+      </div>
+    `;
+  });
+
+  buttons.sandboxConfetti.addEventListener("click", () => {
+    triggerConfettiEffect();
+    displays.sandboxPreviewOutput.innerHTML = `
+      <div style="color: #ec4899; font-weight: 600; text-align: center;">
+        🎉 Confetti Burst effect triggered!
+      </div>
+    `;
+  });
+
   // First-Time Onboarding Completion
   buttons.completeSetup.addEventListener("click", () => {
     const uname = inputs.setupUsername.value.trim();
@@ -775,7 +835,7 @@ function resetAppState() {
   displays.contextMenuModal.classList.add("hidden");
   closeAllPopovers();
 
-  showView("landing");
+  showView("showcase");
 }
 
 init();
