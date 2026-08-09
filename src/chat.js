@@ -12,6 +12,7 @@ let roomChannel = null;
 const messageStore = new Map();
 const typingUsers = new Set();
 let typingListeners = new Set();
+let onMessagesUpdatedCallback = null;
 
 export function sendTypingIndicator(roomCode, uid, isTyping) {
   if (roomChannel) {
@@ -33,8 +34,14 @@ function notifyTyping() {
   typingListeners.forEach((fn) => fn(users));
 }
 
+function notifyMessages() {
+  if (onMessagesUpdatedCallback) {
+    const sorted = Array.from(messageStore.values()).sort((a, b) => a.timestamp - b.timestamp);
+    onMessagesUpdatedCallback(sorted);
+  }
+}
+
 export async function sendMessage(roomCode, uid, payload) {
-  // payload can be text or object: { text, mediaType: 'image'|'gif'|'sticker'|'audio', mediaUrl, replyTo }
   let text = typeof payload === "string" ? payload : payload.text || "";
   const mediaType = typeof payload === "object" ? payload.mediaType || "text" : "text";
   const mediaUrl = typeof payload === "object" ? payload.mediaUrl || null : null;
@@ -43,21 +50,26 @@ export async function sendMessage(roomCode, uid, payload) {
   if (!text.trim() && !mediaUrl) return;
 
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const msgId = "msg_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
   
   const msgObj = {
-    id: "msg_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36),
+    id: msgId,
     sender: uid,
     text: text.trim(),
     mediaType,
     mediaUrl,
     replyTo,
-    reactions: {}, // { emoji: [uid1, uid2] }
+    reactions: {},
     localTime: timeStr,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    isNew: true // Flag for popping up animation from typebar
   };
 
+  // 1. Instantly store locally & trigger synchronous UI render for sender!
   messageStore.set(msgObj.id, msgObj);
+  notifyMessages();
 
+  // 2. Broadcast to other tabs instantly
   if (roomChannel) {
     roomChannel.postMessage({
       type: "CHAT_MESSAGE",
@@ -66,6 +78,7 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
+  // 3. Try Firestore in background if configured
   if (isConfigured) {
     withTimeout(addDoc(collection(db, "rooms", roomCode, "messages"), {
       sender: uid,
@@ -96,6 +109,7 @@ export function toggleReaction(roomCode, messageId, emoji, uid) {
   }
 
   messageStore.set(messageId, msg);
+  notifyMessages();
 
   if (roomChannel) {
     roomChannel.postMessage({
@@ -109,29 +123,27 @@ export function toggleReaction(roomCode, messageId, emoji, uid) {
 export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   messageStore.clear();
   typingUsers.clear();
+  onMessagesUpdatedCallback = onMessagesUpdated;
 
   if (roomChannel) {
     roomChannel.close();
   }
   roomChannel = new BroadcastChannel(`connect_chat_${roomCode}`);
 
-  const notify = () => {
-    const sorted = Array.from(messageStore.values()).sort((a, b) => a.timestamp - b.timestamp);
-    onMessagesUpdated(sorted);
-  };
-
   roomChannel.onmessage = (event) => {
     const { type, message, messageId, reactions, uid: typingUid, isTyping } = event.data || {};
     
     if (type === "CHAT_MESSAGE" && message) {
-      messageStore.set(message.id, message);
-      notify();
+      if (!messageStore.has(message.id)) {
+        messageStore.set(message.id, message);
+        notifyMessages();
+      }
     } else if (type === "MESSAGE_REACTION" && messageId) {
       const existing = messageStore.get(messageId);
       if (existing) {
         existing.reactions = reactions;
         messageStore.set(messageId, existing);
-        notify();
+        notifyMessages();
       }
     } else if (type === "TYPING_STATUS" && typingUid !== uid) {
       if (isTyping) {
@@ -142,7 +154,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
       notifyTyping();
     } else if (type === "PURGE_CHAT") {
       messageStore.clear();
-      notify();
+      notifyMessages();
     }
   };
 
@@ -165,17 +177,19 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
               timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
 
-            messageStore.set(id, {
-              id,
-              sender: data.sender,
-              text: data.text || "",
-              mediaType: data.mediaType || "text",
-              mediaUrl: data.mediaUrl || null,
-              replyTo: data.replyTo || null,
-              reactions: data.reactions || {},
-              localTime: timeStr,
-              timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
-            });
+            if (!messageStore.has(id)) {
+              messageStore.set(id, {
+                id,
+                sender: data.sender,
+                text: data.text || "",
+                mediaType: data.mediaType || "text",
+                mediaUrl: data.mediaUrl || null,
+                replyTo: data.replyTo || null,
+                reactions: data.reactions || {},
+                localTime: timeStr,
+                timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
+              });
+            }
           } else if (change.type === "modified") {
             const existing = messageStore.get(id);
             if (existing) {
@@ -186,12 +200,12 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
             messageStore.delete(id);
           }
         });
-        notify();
+        notifyMessages();
       });
     } catch (err) {}
   }
 
-  notify();
+  notifyMessages();
 
   return () => {
     if (unsubFirestore) unsubFirestore();
@@ -199,6 +213,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
       roomChannel.close();
       roomChannel = null;
     }
+    onMessagesUpdatedCallback = null;
   };
 }
 
@@ -207,4 +222,5 @@ export function purgeLocalMessages(roomCode) {
   if (roomChannel) {
     roomChannel.postMessage({ type: "PURGE_CHAT" });
   }
+  notifyMessages();
 }

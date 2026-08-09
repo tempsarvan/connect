@@ -81,7 +81,6 @@ export function hideOverlayDisconnected() {
   displays.overlayDisconnected.classList.add("hidden");
 }
 
-// Lightbox
 export function openLightbox(src) {
   displays.lightboxImg.src = src;
   displays.lightboxModal.classList.remove("hidden");
@@ -92,7 +91,6 @@ export function closeLightbox() {
   displays.lightboxImg.src = "";
 }
 
-// Reply bar
 export function showReplyPreview(msgText) {
   displays.replyPreviewText.textContent = msgText.length > 50 ? msgText.substring(0, 50) + "..." : msgText;
   displays.replyPreviewBar.classList.remove("hidden");
@@ -103,9 +101,7 @@ export function hideReplyPreview() {
   displays.replyPreviewText.textContent = "";
 }
 
-// Popovers
 export function initMediaPopovers(onSelectGif, onSelectSticker) {
-  // Populate GIFs
   displays.gifsGrid.innerHTML = "";
   TRENDING_GIFS.forEach((gif) => {
     const img = document.createElement("img");
@@ -119,7 +115,6 @@ export function initMediaPopovers(onSelectGif, onSelectSticker) {
     displays.gifsGrid.appendChild(img);
   });
 
-  // Populate Stickers
   displays.stickersGrid.innerHTML = "";
   STICKERS.forEach((st) => {
     const img = document.createElement("img");
@@ -132,6 +127,64 @@ export function initMediaPopovers(onSelectGif, onSelectSticker) {
     };
     displays.stickersGrid.appendChild(img);
   });
+}
+
+// Custom Premium Voice Note Player Component
+function createCustomAudioPlayer(audioUrl) {
+  const container = document.createElement("div");
+  container.className = "custom-audio-player";
+
+  const playBtn = document.createElement("div");
+  playBtn.className = "audio-play-btn";
+  playBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+
+  const waveform = document.createElement("div");
+  waveform.className = "audio-waveform-bars";
+  for (let i = 0; i < 12; i++) {
+    const bar = document.createElement("div");
+    bar.className = "wave-bar";
+    bar.style.height = `${Math.floor(Math.random() * 60) + 30}%`;
+    waveform.appendChild(bar);
+  }
+
+  const durationLabel = document.createElement("span");
+  durationLabel.className = "audio-dur";
+  durationLabel.textContent = "0:00";
+
+  const audio = new Audio(audioUrl);
+  
+  audio.onloadedmetadata = () => {
+    const secs = Math.floor(audio.duration || 0);
+    durationLabel.textContent = `0:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  audio.ontimeupdate = () => {
+    const curr = Math.floor(audio.currentTime);
+    durationLabel.textContent = `0:${curr < 10 ? '0' : ''}${curr}`;
+  };
+
+  audio.onended = () => {
+    container.classList.remove("playing");
+    playBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+  };
+
+  playBtn.onclick = () => {
+    if (audio.paused) {
+      audio.play();
+      container.classList.add("playing");
+      playBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+    } else {
+      audio.pause();
+      container.classList.remove("playing");
+      playBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    }
+  };
+
+  container.appendChild(playBtn);
+  container.appendChild(waveform);
+  container.appendChild(durationLabel);
+
+  return container;
 }
 
 // Render Messages Engine
@@ -190,15 +243,11 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       img.alt = "Sticker";
       bubble.style.background = "transparent";
       bubble.style.border = "none";
+      bubble.style.boxShadow = "none";
       bubble.appendChild(img);
     } else if (msg.mediaType === "audio" && msg.mediaUrl) {
-      const audioWrap = document.createElement("div");
-      audioWrap.className = "audio-player-bubble";
-      const audio = document.createElement("audio");
-      audio.src = msg.mediaUrl;
-      audio.controls = true;
-      audioWrap.appendChild(audio);
-      bubble.appendChild(audioWrap);
+      const player = createCustomAudioPlayer(msg.mediaUrl);
+      bubble.appendChild(player);
     } else {
       bubble.textContent = msg.text;
     }
@@ -225,7 +274,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     const actions = document.createElement("div");
     actions.className = "msg-actions";
     
-    // Quick Reaction buttons
     ["❤️", "😂", "👍", "🔥"].forEach((emoji) => {
       const btn = document.createElement("button");
       btn.className = "msg-action-btn";
@@ -234,7 +282,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       actions.appendChild(btn);
     });
 
-    // Reply action button
     const replyBtn = document.createElement("button");
     replyBtn.className = "msg-action-btn";
     replyBtn.textContent = "↩️ reply";
@@ -252,6 +299,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     displays.messagesList.appendChild(row);
   });
 
-  // Auto-scroll to bottom
+  // Smooth scroll to bottom
   displays.messagesContainer.scrollTop = displays.messagesContainer.scrollHeight;
 }
