@@ -1,4 +1,4 @@
-import { STICKERS, TRENDING_GIFS } from "./media";
+import { STICKERS, TRENDING_GIFS, EMOJI_CATEGORIES } from "./media";
 
 export const views = {
   landing: document.getElementById("view-landing"),
@@ -14,6 +14,8 @@ export const buttons = {
   endSession: document.getElementById("btn-end-session"),
   send: document.getElementById("btn-send"),
   returnHome: document.getElementById("btn-return-home"),
+  toggleEmojis: document.getElementById("btn-toggle-emojis"),
+  closeEmojis: document.getElementById("btn-close-emojis"),
   toggleGifs: document.getElementById("btn-toggle-gifs"),
   closeGifs: document.getElementById("btn-close-gifs"),
   toggleStickers: document.getElementById("btn-toggle-stickers"),
@@ -44,6 +46,9 @@ export const displays = {
   overlayDisconnected: document.getElementById("overlay-disconnected"),
   toast: document.getElementById("toast"),
   typingIndicator: document.getElementById("typing-indicator"),
+  popoverEmojis: document.getElementById("popover-emojis"),
+  emojiCategories: document.getElementById("emoji-categories"),
+  emojisGrid: document.getElementById("emojis-grid"),
   popoverGifs: document.getElementById("popover-gifs"),
   gifsGrid: document.getElementById("gifs-grid"),
   popoverStickers: document.getElementById("popover-stickers"),
@@ -146,6 +151,38 @@ export function renderNotifications(notificationsList, unreadCount) {
     `;
     displays.notificationsList.appendChild(item);
   });
+}
+
+export function initEmojiPanel(onSelectEmoji) {
+  displays.emojiCategories.innerHTML = "";
+  displays.emojisGrid.innerHTML = "";
+
+  const renderCategoryEmojis = (catIndex) => {
+    displays.emojisGrid.innerHTML = "";
+    const category = EMOJI_CATEGORIES[catIndex];
+    category.emojis.forEach((char) => {
+      const span = document.createElement("span");
+      span.className = "emoji-item";
+      span.textContent = char;
+      span.onclick = () => onSelectEmoji(char);
+      displays.emojisGrid.appendChild(span);
+    });
+  };
+
+  EMOJI_CATEGORIES.forEach((cat, index) => {
+    const btn = document.createElement("button");
+    btn.className = `emoji-cat-btn ${index === 0 ? "active" : ""}`;
+    btn.textContent = cat.icon;
+    btn.title = cat.name;
+    btn.onclick = () => {
+      document.querySelectorAll(".emoji-cat-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderCategoryEmojis(index);
+    };
+    displays.emojiCategories.appendChild(btn);
+  });
+
+  renderCategoryEmojis(0);
 }
 
 export function initMediaPopovers(onSelectGif, onSelectSticker) {

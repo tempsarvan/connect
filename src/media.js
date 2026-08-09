@@ -1,6 +1,35 @@
-// Helper utilities for photos, GIFs, stickers, and voice audio recording
+// Helper utilities for photos, GIFs, stickers, emojis, and voice audio recording
 
-// 1. Photo Compression & Base64 Converter
+// 1. Categorized Emojis Dataset
+export const EMOJI_CATEGORIES = [
+  {
+    name: "Smileys",
+    icon: "😀",
+    emojis: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕"]
+  },
+  {
+    name: "Gestures",
+    icon: "👍",
+    emojis: ["👍", "👎", "👊", "✊", "🤛", "🤜", "🤞", "✌️", "🤟", "🤘", "👌", "🤏", "👈", "👉", "👆", "👇", "☝️", "✋", "🤚", "🖐", "🖖", "👋", "🤙", "💪", "🖕", "✍️", "🙏", "🤝", "👏", "🙌", "👐", "🤲", "💅", "🤳"]
+  },
+  {
+    name: "Hearts",
+    icon: "❤️",
+    emojis: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "💌", "💋", "👨‍❤️‍👨", "👩‍❤️‍👩", "💑", "👩‍❤️‍💋‍👨"]
+  },
+  {
+    name: "Objects & Vibes",
+    icon: "🔥",
+    emojis: ["🔥", "⚡️", "🌟", "✨", "🎉", "🎊", "🎈", "🎁", "🏆", "🥇", "👑", "💎", "💡", "💣", "🔑", "🚀", "💯", "🎯", "🎲", "🎮", "🎨", "🎭", "🎤", "🎧", "🎬", "📱", "💻", "⌚️", "💰", "💵"]
+  },
+  {
+    name: "Food & Nature",
+    icon: "🍕",
+    emojis: ["🍕", "🍔", "🍟", "🌭", "🍿", "🥓", "🥚", "🧀", "🍩", "🍪", "🎂", "🍰", "🍫", "🍬", "🍭", "☕️", "🍵", "🥤", "🧃", "🍺", "🍻", "🥂", "🍷", "🐶", "🐱", "🐭", "🦊", "🐼", "🐯", "🦁", "🐸", "🐵"]
+  }
+];
+
+// 2. Photo Compression & Base64 Converter
 export function processImageFile(file, maxDimension = 1200, quality = 0.85) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
@@ -42,7 +71,7 @@ export function processImageFile(file, maxDimension = 1200, quality = 0.85) {
   });
 }
 
-// 2. Curated Stickers Data
+// 3. Curated Stickers Data
 export const STICKERS = [
   { id: "s1", label: "Cat Vibe", url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3ZkZnVnd3FubTF4M3U2aXQ4cmk5dGpxZzQ1cnk5NmdyejR6NWQyeCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/CjmvTCZf2U3p09Cn0h/giphy.gif" },
   { id: "s2", label: "Fire", url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnFlMnZma3U0cnlsNmRxYndwMnY5OXF5NDdsMjdydGFwZzR0b3QzZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/26tP3M3i03hoIyl6o/giphy.gif" },
@@ -54,7 +83,7 @@ export const STICKERS = [
   { id: "s8", label: "100", url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTBpdnlnZmk1eTN6MHl5MnE1dnVvdHRzMWl3eGN4aXNmaWJkMTBhOSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7abKhOpu0NwenH3O/giphy.gif" }
 ];
 
-// 3. Curated Trending GIFs (Giphy Direct CDN links)
+// 4. Curated Trending GIFs
 export const TRENDING_GIFS = [
   { id: "g1", title: "Wave", url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3ZkZnVnd3FubTF4M3U2aXQ4cmk5dGpxZzQ1cnk5NmdyejR6NWQyeCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/dzaUX7CAG0Ihi/giphy.gif" },
   { id: "g2", title: "Popcorn", url: "https://media.giphy.com/media/gl0mkIZOW6Nwc/giphy.gif" },
@@ -66,7 +95,7 @@ export const TRENDING_GIFS = [
   { id: "g8", title: "Laughing", url: "https://media.giphy.com/media/10JhviFuU2gWD6/giphy.gif" }
 ];
 
-// 4. Voice Recorder Module using MediaRecorder API
+// 5. Voice Recorder Module
 export class VoiceRecorder {
   constructor() {
     this.mediaRecorder = null;
@@ -103,7 +132,7 @@ export class VoiceRecorder {
         const reader = new FileReader();
         reader.onloadend = () => {
           this.cleanup();
-          resolve(reader.result); // Base64 DataURL
+          resolve(reader.result);
         };
         reader.onerror = reject;
         reader.readAsDataURL(audioBlob);

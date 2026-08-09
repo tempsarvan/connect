@@ -40,6 +40,7 @@ import {
   renderMessages,
   renderNotifications,
   initMediaPopovers,
+  initEmojiPanel,
   showReplyPreview,
   hideReplyPreview,
   closeLightbox,
@@ -69,6 +70,7 @@ async function init() {
   }
 
   initMediaPopovers(handleSendGif, handleSendSticker);
+  initEmojiPanel(handleSelectEmoji);
   
   listenToNotifications((notifs, unread) => {
     renderNotifications(notifs, unread);
@@ -113,7 +115,21 @@ function setupEventListeners() {
   // Media Attachments
   inputs.photoUpload.addEventListener("change", handlePhotoUpload);
 
+  // Emojis Popover Toggle
+  buttons.toggleEmojis.addEventListener("click", () => {
+    displays.popoverGifs.classList.add("hidden");
+    displays.popoverStickers.classList.add("hidden");
+    displays.popoverNotifications.classList.add("hidden");
+    displays.popoverEmojis.classList.toggle("hidden");
+  });
+
+  buttons.closeEmojis.addEventListener("click", () => {
+    displays.popoverEmojis.classList.add("hidden");
+  });
+
+  // GIFs Popover Toggle
   buttons.toggleGifs.addEventListener("click", () => {
+    displays.popoverEmojis.classList.add("hidden");
     displays.popoverStickers.classList.add("hidden");
     displays.popoverNotifications.classList.add("hidden");
     displays.popoverGifs.classList.toggle("hidden");
@@ -123,7 +139,9 @@ function setupEventListeners() {
     displays.popoverGifs.classList.add("hidden");
   });
 
+  // Stickers Popover Toggle
   buttons.toggleStickers.addEventListener("click", () => {
+    displays.popoverEmojis.classList.add("hidden");
     displays.popoverGifs.classList.add("hidden");
     displays.popoverNotifications.classList.add("hidden");
     displays.popoverStickers.classList.toggle("hidden");
@@ -135,6 +153,7 @@ function setupEventListeners() {
 
   // Notifications Drawer
   buttons.notifications.addEventListener("click", () => {
+    displays.popoverEmojis.classList.add("hidden");
     displays.popoverGifs.classList.add("hidden");
     displays.popoverStickers.classList.add("hidden");
     displays.popoverNotifications.classList.toggle("hidden");
@@ -145,7 +164,7 @@ function setupEventListeners() {
     clearNotifications();
   });
 
-  // Calling WIP Modal Handlers (Displays WIP graphic when either call button is clicked)
+  // Calling WIP Modal Handlers
   buttons.audioCall.addEventListener("click", () => {
     addNotification("Voice Call", "Feature under construction", "📞");
     showWipModal();
@@ -170,6 +189,16 @@ function setupEventListeners() {
   });
 
   buttons.closeLightbox.addEventListener("click", closeLightbox);
+}
+
+function handleSelectEmoji(char) {
+  const input = inputs.message;
+  const start = input.selectionStart || input.value.length;
+  const end = input.selectionEnd || input.value.length;
+
+  input.value = input.value.substring(0, start) + char + input.value.substring(end);
+  input.selectionStart = input.selectionEnd = start + char.length;
+  input.focus();
 }
 
 function handleTypingEvent() {
@@ -463,6 +492,7 @@ function resetAppState() {
   displays.messagesList.innerHTML = "";
   hideReplyPreview();
   hideWipModal();
+  displays.popoverEmojis.classList.add("hidden");
   displays.popoverGifs.classList.add("hidden");
   displays.popoverStickers.classList.add("hidden");
   displays.popoverNotifications.classList.add("hidden");
