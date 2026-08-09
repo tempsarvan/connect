@@ -366,7 +366,19 @@ function setupEventListeners() {
   });
 
   buttons.navFeatures.addEventListener("click", () => {
-    document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById("section-changelog")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  // Footer link handlers
+  document.getElementById("link-footer-login")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("login");
+  });
+  document.getElementById("link-footer-signup")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("signup");
   });
 
   // Auth Modal Handlers
