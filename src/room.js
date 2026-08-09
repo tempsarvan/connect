@@ -18,13 +18,20 @@ export function generateRoomCode() {
   return code;
 }
 
-// Global broadcast channel for instant multi-tab sync
 const globalChannel = new BroadcastChannel("connect_room_registry");
 const localRooms = new Map();
+const localRoomListeners = new Map(); // roomCode -> Set of listener functions
 
-// Listen to room query requests from other tabs on same origin
+function notifyRoomListeners(roomCode, roomData) {
+  const listeners = localRoomListeners.get(roomCode);
+  if (listeners) {
+    listeners.forEach((fn) => fn(roomData));
+  }
+}
+
+// Listen to room events across tabs on same origin & localStorage sync
 globalChannel.onmessage = (event) => {
-  const { type, roomCode, joinerUid, senderTabId } = event.data || {};
+  const { type, roomCode, joinerUid, room } = event.data || {};
   
   if (type === "QUERY_ROOM") {
     if (localRooms.has(roomCode)) {
@@ -32,8 +39,7 @@ globalChannel.onmessage = (event) => {
       globalChannel.postMessage({
         type: "ROOM_FOUND",
         roomCode,
-        room,
-        targetTabId: senderTabId
+        room
       });
     }
   } else if (type === "JOIN_REQUEST") {
@@ -44,6 +50,10 @@ globalChannel.onmessage = (event) => {
         room.status = "active";
         localRooms.set(roomCode, room);
 
+        // Notify local listeners (Host tab!)
+        notifyRoomListeners(roomCode, room);
+
+        // Broadcast to joiner tab
         globalChannel.postMessage({
           type: "ROOM_UPDATED",
           roomCode,
@@ -51,8 +61,14 @@ globalChannel.onmessage = (event) => {
         });
       }
     }
-  } else if (type === "DESTROY_ROOM") {
+  } else if (type === "ROOM_UPDATED" || type === "ROOM_CREATED") {
+    if (room) {
+      localRooms.set(roomCode, room);
+      notifyRoomListeners(roomCode, room);
+    }
+  } else if (type === "DESTROY_ROOM" || type === "SESSION_ENDED") {
     localRooms.delete(roomCode);
+    notifyRoomListeners(roomCode, { status: "ended" });
   }
 };
 
@@ -65,18 +81,14 @@ export async function createRoom(roomCode, uid) {
     createdAt: Date.now()
   };
 
-  // Register locally instantly
   localRooms.set(roomCode, roomData);
   globalChannel.postMessage({ type: "ROOM_CREATED", roomCode, room: roomData });
 
-  // Try Firestore in background if configured, with short timeout so it NEVER hangs
   if (isConfigured) {
     withTimeout(setDoc(doc(db, "rooms", roomCode), {
       ...roomData,
       createdAt: serverTimestamp()
-    })).catch(() => {
-      // Ignore background firestore timeout
-    });
+    })).catch(() => {});
   }
 
   return roomData;
@@ -109,12 +121,11 @@ export async function joinRoom(roomCode, uid) {
     }
   }
 
-  // 2. Local broadcast room lookup
+  // 2. Local BroadcastChannel + LocalStorage multi-tab lookup
   return new Promise((resolve, reject) => {
-    const myTabId = Math.random().toString(36).substring(2);
     let resolved = false;
 
-    // Check if we have it locally
+    // Check if room exists in localRooms map (Host is on same tab / instance)
     if (localRooms.has(roomCode)) {
       const room = localRooms.get(roomCode);
       if (room.status === "ended") {
@@ -127,6 +138,8 @@ export async function joinRoom(roomCode, uid) {
         room.members.push(uid);
         room.status = "active";
       }
+      localRooms.set(roomCode, room);
+      notifyRoomListeners(roomCode, room);
       globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
       return resolve(room);
     }
@@ -150,65 +163,68 @@ export async function joinRoom(roomCode, uid) {
           joinerUid: uid
         });
 
-        resolve({ ...room, status: "active", members: [...room.members, uid] });
+        const activeRoom = { ...room, status: "active", members: [...room.members, uid] };
+        localRooms.set(roomCode, activeRoom);
+        notifyRoomListeners(roomCode, activeRoom);
+        resolve(activeRoom);
       }
     };
 
     globalChannel.addEventListener("message", handleResponse);
-    globalChannel.postMessage({ type: "QUERY_ROOM", roomCode, senderTabId: myTabId });
+    globalChannel.postMessage({ type: "QUERY_ROOM", roomCode });
 
-    // Instant fallback if no other tab responds: grant access to joined room
+    // Fallback if host is on different origin/network or tab didn't answer in 300ms
     setTimeout(() => {
       if (!resolved) {
         resolved = true;
         globalChannel.removeEventListener("message", handleResponse);
         
-        const fallbackRoom = {
+        const activeRoom = {
           code: roomCode,
           creator: uid,
           members: [uid],
           status: "active",
           createdAt: Date.now()
         };
-        localRooms.set(roomCode, fallbackRoom);
-        resolve(fallbackRoom);
+        localRooms.set(roomCode, activeRoom);
+        notifyRoomListeners(roomCode, activeRoom);
+        resolve(activeRoom);
       }
-    }, 400);
+    }, 300);
   });
 }
 
 export function listenToRoom(roomCode, onUpdate) {
-  let unsubFirestore = null;
+  if (!localRoomListeners.has(roomCode)) {
+    localRoomListeners.set(roomCode, new Set());
+  }
+  localRoomListeners.get(roomCode).add(onUpdate);
 
+  // Trigger immediate callback if room state is already known
+  if (localRooms.has(roomCode)) {
+    onUpdate(localRooms.get(roomCode));
+  }
+
+  let unsubFirestore = null;
   if (isConfigured) {
     try {
       const roomRef = doc(db, "rooms", roomCode);
       unsubFirestore = onSnapshot(roomRef, (snap) => {
         if (snap.exists()) {
-          onUpdate(snap.data());
+          const data = snap.data();
+          localRooms.set(roomCode, data);
+          onUpdate(data);
         }
       });
-    } catch (err) {
-      // Ignore firestore listener failure
-    }
+    } catch (err) {}
   }
-
-  // Local Broadcast listener
-  const handleBroadcast = (event) => {
-    const { type, roomCode: code, room } = event.data || {};
-    if (code === roomCode) {
-      if (type === "ROOM_UPDATED" || type === "ROOM_CREATED") {
-        onUpdate(room);
-      } else if (type === "DESTROY_ROOM" || type === "SESSION_ENDED") {
-        onUpdate({ status: "ended" });
-      }
-    }
-  };
-
-  globalChannel.addEventListener("message", handleBroadcast);
 
   return () => {
     if (unsubFirestore) unsubFirestore();
-    globalChannel.removeEventListener("message", handleBroadcast);
+    const listeners = localRoomListeners.get(roomCode);
+    if (listeners) {
+      listeners.delete(onUpdate);
+      if (listeners.size === 0) localRoomListeners.delete(roomCode);
+    }
   };
 }

@@ -10,25 +10,54 @@ import {
 
 let roomChannel = null;
 const messageStore = new Map();
+const typingUsers = new Set();
+let typingListeners = new Set();
 
-export async function sendMessage(roomCode, uid, text) {
-  if (!text || !text.trim()) return;
+export function sendTypingIndicator(roomCode, uid, isTyping) {
+  if (roomChannel) {
+    roomChannel.postMessage({
+      type: "TYPING_STATUS",
+      uid,
+      isTyping
+    });
+  }
+}
 
-  const cleanText = text.trim();
+export function listenToTyping(onTypingChange) {
+  typingListeners.add(onTypingChange);
+  return () => typingListeners.delete(onTypingChange);
+}
+
+function notifyTyping() {
+  const users = Array.from(typingUsers);
+  typingListeners.forEach((fn) => fn(users));
+}
+
+export async function sendMessage(roomCode, uid, payload) {
+  // payload can be text or object: { text, mediaType: 'image'|'gif'|'sticker'|'audio', mediaUrl, replyTo }
+  let text = typeof payload === "string" ? payload : payload.text || "";
+  const mediaType = typeof payload === "object" ? payload.mediaType || "text" : "text";
+  const mediaUrl = typeof payload === "object" ? payload.mediaUrl || null : null;
+  const replyTo = typeof payload === "object" ? payload.replyTo || null : null;
+
+  if (!text.trim() && !mediaUrl) return;
+
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
   const msgObj = {
-    id: "msg_" + Math.random().toString(36).substring(2, 11),
+    id: "msg_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36),
     sender: uid,
-    text: cleanText,
+    text: text.trim(),
+    mediaType,
+    mediaUrl,
+    replyTo,
+    reactions: {}, // { emoji: [uid1, uid2] }
     localTime: timeStr,
     timestamp: Date.now()
   };
 
-  // Add to local store instantly
   messageStore.set(msgObj.id, msgObj);
 
-  // Broadcast to other tabs instantly
   if (roomChannel) {
     roomChannel.postMessage({
       type: "CHAT_MESSAGE",
@@ -37,20 +66,49 @@ export async function sendMessage(roomCode, uid, text) {
     });
   }
 
-  // Try Firestore in background if configured
   if (isConfigured) {
     withTimeout(addDoc(collection(db, "rooms", roomCode, "messages"), {
       sender: uid,
-      text: cleanText,
+      text: text.trim(),
+      mediaType,
+      mediaUrl,
+      replyTo,
+      reactions: {},
       localTime: timeStr,
       timestamp: serverTimestamp()
     }), 1000).catch(() => {});
   }
 }
 
+export function toggleReaction(roomCode, messageId, emoji, uid) {
+  const msg = messageStore.get(messageId);
+  if (!msg) return;
+
+  if (!msg.reactions) msg.reactions = {};
+  if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+
+  const userIdx = msg.reactions[emoji].indexOf(uid);
+  if (userIdx >= 0) {
+    msg.reactions[emoji].splice(userIdx, 1);
+    if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
+  } else {
+    msg.reactions[emoji].push(uid);
+  }
+
+  messageStore.set(messageId, msg);
+
+  if (roomChannel) {
+    roomChannel.postMessage({
+      type: "MESSAGE_REACTION",
+      messageId,
+      reactions: msg.reactions
+    });
+  }
+}
+
 export function listenToMessages(roomCode, uid, onMessagesUpdated) {
-  // Clear local message store for new room
   messageStore.clear();
+  typingUsers.clear();
 
   if (roomChannel) {
     roomChannel.close();
@@ -62,19 +120,32 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     onMessagesUpdated(sorted);
   };
 
-  // BroadcastChannel listener for multi-tab chat
   roomChannel.onmessage = (event) => {
-    const { type, message } = event.data || {};
+    const { type, message, messageId, reactions, uid: typingUid, isTyping } = event.data || {};
+    
     if (type === "CHAT_MESSAGE" && message) {
       messageStore.set(message.id, message);
       notify();
+    } else if (type === "MESSAGE_REACTION" && messageId) {
+      const existing = messageStore.get(messageId);
+      if (existing) {
+        existing.reactions = reactions;
+        messageStore.set(messageId, existing);
+        notify();
+      }
+    } else if (type === "TYPING_STATUS" && typingUid !== uid) {
+      if (isTyping) {
+        typingUsers.add(typingUid);
+      } else {
+        typingUsers.delete(typingUid);
+      }
+      notifyTyping();
     } else if (type === "PURGE_CHAT") {
       messageStore.clear();
       notify();
     }
   };
 
-  // Firestore listener if configured
   let unsubFirestore = null;
   if (isConfigured) {
     try {
@@ -97,10 +168,20 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
             messageStore.set(id, {
               id,
               sender: data.sender,
-              text: data.text,
+              text: data.text || "",
+              mediaType: data.mediaType || "text",
+              mediaUrl: data.mediaUrl || null,
+              replyTo: data.replyTo || null,
+              reactions: data.reactions || {},
               localTime: timeStr,
               timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
             });
+          } else if (change.type === "modified") {
+            const existing = messageStore.get(id);
+            if (existing) {
+              existing.reactions = data.reactions || {};
+              messageStore.set(id, existing);
+            }
           } else if (change.type === "removed") {
             messageStore.delete(id);
           }
@@ -110,7 +191,6 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     } catch (err) {}
   }
 
-  // Initial notification
   notify();
 
   return () => {

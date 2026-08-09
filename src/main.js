@@ -5,12 +5,22 @@ import {
   joinRoom, 
   listenToRoom 
 } from "./room";
-import { sendMessage, listenToMessages } from "./chat";
+import { 
+  sendMessage, 
+  listenToMessages, 
+  toggleReaction, 
+  sendTypingIndicator, 
+  listenToTyping 
+} from "./chat";
 import { 
   destroyRoomSession, 
   registerUnloadCleanup, 
   unregisterUnloadCleanup 
 } from "./cleanup";
+import { 
+  processImageFile, 
+  VoiceRecorder 
+} from "./media";
 import { 
   views, 
   buttons, 
@@ -20,16 +30,26 @@ import {
   showToast, 
   showOverlayDisconnected, 
   hideOverlayDisconnected, 
-  renderMessages 
+  renderMessages,
+  initMediaPopovers,
+  showReplyPreview,
+  hideReplyPreview,
+  closeLightbox
 } from "./ui";
 
 let currentRoomCode = null;
 let currentUid = null;
 let roomUnsubscribe = null;
 let chatUnsubscribe = null;
+let typingUnsubscribe = null;
+
+let currentReplyMessage = null;
+let voiceRecorder = null;
+let voiceTimerInterval = null;
+let voiceStartTime = 0;
+let typingTimeout = null;
 
 async function init() {
-  // Always attach event listeners first
   setupEventListeners();
 
   try {
@@ -37,24 +57,24 @@ async function init() {
   } catch (err) {
     currentUid = getUserUid();
   }
+
+  // Initialize popovers
+  initMediaPopovers(handleSendGif, handleSendSticker);
 }
 
 function setupEventListeners() {
-  // 1. Create Room
+  // 1. Navigation & Rooms
   buttons.create.addEventListener("click", handleCreateRoom);
-
-  // 2. Join Room
   buttons.join.addEventListener("click", handleJoinRoom);
+
   inputs.code.addEventListener("keydown", (e) => {
     if (e.key === "Enter") handleJoinRoom();
   });
 
-  // Code input formatting
   inputs.code.addEventListener("input", () => {
     inputs.code.value = inputs.code.value.toUpperCase().trim();
   });
 
-  // 3. Copy Code
   buttons.copyCode.addEventListener("click", () => {
     if (currentRoomCode) {
       navigator.clipboard.writeText(currentRoomCode);
@@ -62,10 +82,11 @@ function setupEventListeners() {
     }
   });
 
-  // 4. Cancel Room (from waiting view)
   buttons.cancelRoom.addEventListener("click", handleCancelRoom);
+  buttons.endSession.addEventListener("click", handleEndSession);
+  buttons.returnHome.addEventListener("click", handleReturnHome);
 
-  // 5. Send Message
+  // 2. Chat Input & Typing
   buttons.send.addEventListener("click", handleSendMessage);
   inputs.message.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -74,11 +95,51 @@ function setupEventListeners() {
     }
   });
 
-  // 6. End Session
-  buttons.endSession.addEventListener("click", handleEndSession);
+  inputs.message.addEventListener("input", handleTypingEvent);
 
-  // 7. Return Home (from overlay)
-  buttons.returnHome.addEventListener("click", handleReturnHome);
+  // 3. Media Attachments
+  inputs.photoUpload.addEventListener("change", handlePhotoUpload);
+
+  buttons.toggleGifs.addEventListener("click", () => {
+    displays.popoverStickers.classList.add("hidden");
+    displays.popoverGifs.classList.toggle("hidden");
+  });
+
+  buttons.closeGifs.addEventListener("click", () => {
+    displays.popoverGifs.classList.add("hidden");
+  });
+
+  buttons.toggleStickers.addEventListener("click", () => {
+    displays.popoverGifs.classList.add("hidden");
+    displays.popoverStickers.classList.toggle("hidden");
+  });
+
+  buttons.closeStickers.addEventListener("click", () => {
+    displays.popoverStickers.classList.add("hidden");
+  });
+
+  // 4. Voice Recorder
+  buttons.recordVoice.addEventListener("click", handleToggleVoiceRecord);
+  buttons.cancelVoice.addEventListener("click", handleCancelVoiceRecord);
+
+  // 5. Reply Cancel & Lightbox Close
+  buttons.cancelReply.addEventListener("click", () => {
+    currentReplyMessage = null;
+    hideReplyPreview();
+  });
+
+  buttons.closeLightbox.addEventListener("click", closeLightbox);
+}
+
+function handleTypingEvent() {
+  if (!currentRoomCode || !currentUid) return;
+  
+  sendTypingIndicator(currentRoomCode, currentUid, true);
+  
+  if (typingTimeout) clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    sendTypingIndicator(currentRoomCode, currentUid, false);
+  }, 1500);
 }
 
 async function handleCreateRoom() {
@@ -88,14 +149,13 @@ async function handleCreateRoom() {
   const roomCode = generateRoomCode();
   
   try {
-    const roomData = await createRoom(roomCode, currentUid);
+    await createRoom(roomCode, currentUid);
     currentRoomCode = roomCode;
     registerUnloadCleanup(currentRoomCode);
 
     displays.roomCode.textContent = roomCode;
     showView("waiting");
 
-    // Listen for room updates (e.g. peer joining or session end)
     if (roomUnsubscribe) roomUnsubscribe();
     roomUnsubscribe = listenToRoom(roomCode, (roomData) => {
       if (!roomData || roomData.status === "ended") {
@@ -126,7 +186,7 @@ async function handleJoinRoom() {
   if (!currentUid) currentUid = getUserUid();
 
   try {
-    const roomData = await joinRoom(code, currentUid);
+    await joinRoom(code, currentUid);
     currentRoomCode = code;
     registerUnloadCleanup(currentRoomCode);
     startChatSession();
@@ -145,10 +205,20 @@ function startChatSession() {
   // Listen to chat messages
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
-    renderMessages(messages, currentUid);
+    renderMessages(messages, currentUid, handleReactionClick, handleReplyClick);
   });
 
-  // Listen to room status changes (to detect if peer ends session)
+  // Listen to typing status
+  if (typingUnsubscribe) typingUnsubscribe();
+  typingUnsubscribe = listenToTyping((users) => {
+    if (users.length > 0) {
+      displays.typingIndicator.classList.remove("hidden");
+    } else {
+      displays.typingIndicator.classList.add("hidden");
+    }
+  });
+
+  // Listen to room status changes
   if (roomUnsubscribe) roomUnsubscribe();
   roomUnsubscribe = listenToRoom(currentRoomCode, (roomData) => {
     if (!roomData || roomData.status === "ended") {
@@ -157,12 +227,124 @@ function startChatSession() {
   });
 }
 
+// Media Action Handlers
 async function handleSendMessage() {
-  const text = inputs.message.value;
-  if (!text.trim() || !currentRoomCode) return;
+  const text = inputs.message.value.trim();
+  if (!text || !currentRoomCode) return;
 
   inputs.message.value = "";
-  await sendMessage(currentRoomCode, currentUid, text);
+  
+  const payload = {
+    text,
+    mediaType: "text",
+    replyTo: currentReplyMessage ? { id: currentReplyMessage.id, text: currentReplyMessage.text } : null
+  };
+
+  currentReplyMessage = null;
+  hideReplyPreview();
+
+  await sendMessage(currentRoomCode, currentUid, payload);
+  inputs.message.focus();
+}
+
+async function handlePhotoUpload(e) {
+  const file = e.target.files[0];
+  if (!file || !currentRoomCode) return;
+
+  try {
+    showToast("Processing photo...");
+    const dataUrl = await processImageFile(file);
+    
+    await sendMessage(currentRoomCode, currentUid, {
+      text: "",
+      mediaType: "image",
+      mediaUrl: dataUrl
+    });
+
+    inputs.photoUpload.value = "";
+  } catch (err) {
+    showToast("Could not send image: " + err.message);
+  }
+}
+
+async function handleSendGif(gifUrl) {
+  if (!currentRoomCode) return;
+  await sendMessage(currentRoomCode, currentUid, {
+    text: "",
+    mediaType: "gif",
+    mediaUrl: gifUrl
+  });
+}
+
+async function handleSendSticker(stickerUrl) {
+  if (!currentRoomCode) return;
+  await sendMessage(currentRoomCode, currentUid, {
+    text: "",
+    mediaType: "sticker",
+    mediaUrl: stickerUrl
+  });
+}
+
+async function handleToggleVoiceRecord() {
+  if (voiceRecorder) {
+    // Stop & Send
+    try {
+      clearInterval(voiceTimerInterval);
+      displays.voiceRecordingBar.classList.add("hidden");
+      
+      const audioDataUrl = await voiceRecorder.stop();
+      voiceRecorder = null;
+
+      await sendMessage(currentRoomCode, currentUid, {
+        text: "Voice Note",
+        mediaType: "audio",
+        mediaUrl: audioDataUrl
+      });
+    } catch (err) {
+      showToast("Voice recording failed: " + err.message);
+    }
+  } else {
+    // Start Recording
+    try {
+      voiceRecorder = new VoiceRecorder();
+      await voiceRecorder.start();
+
+      voiceStartTime = Date.now();
+      displays.voiceRecordingBar.classList.remove("hidden");
+      
+      voiceTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - voiceStartTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+        displays.voiceRecTimer.textContent = `${mins}:${secs}`;
+      }, 1000);
+
+      showToast("Recording... Tap microphone button to send");
+    } catch (err) {
+      showToast(err.message || "Microphone permission required.");
+      voiceRecorder = null;
+    }
+  }
+}
+
+function handleCancelVoiceRecord() {
+  if (voiceRecorder) {
+    clearInterval(voiceTimerInterval);
+    voiceRecorder.cleanup();
+    voiceRecorder = null;
+    displays.voiceRecordingBar.classList.add("hidden");
+    showToast("Voice note canceled.");
+  }
+}
+
+function handleReactionClick(msgId, emoji) {
+  if (!currentRoomCode) return;
+  toggleReaction(currentRoomCode, msgId, emoji, currentUid);
+}
+
+function handleReplyClick(msg) {
+  currentReplyMessage = msg;
+  showReplyPreview(msg.text || msg.mediaType || "message");
   inputs.message.focus();
 }
 
@@ -190,6 +372,10 @@ function onSessionEnded() {
     roomUnsubscribe();
     roomUnsubscribe = null;
   }
+  if (typingUnsubscribe) {
+    typingUnsubscribe();
+    typingUnsubscribe = null;
+  }
   showOverlayDisconnected();
 }
 
@@ -201,6 +387,7 @@ function handleReturnHome() {
 function resetAppState() {
   unregisterUnloadCleanup();
   currentRoomCode = null;
+  currentReplyMessage = null;
   
   if (roomUnsubscribe) {
     roomUnsubscribe();
@@ -210,15 +397,21 @@ function resetAppState() {
     chatUnsubscribe();
     chatUnsubscribe = null;
   }
+  if (typingUnsubscribe) {
+    typingUnsubscribe();
+    typingUnsubscribe = null;
+  }
 
   inputs.code.value = "";
   inputs.message.value = "";
   buttons.create.disabled = false;
   buttons.join.disabled = false;
   displays.messagesList.innerHTML = "";
+  hideReplyPreview();
+  displays.popoverGifs.classList.add("hidden");
+  displays.popoverStickers.classList.add("hidden");
 
   showView("landing");
 }
 
-// Start application
 init();
