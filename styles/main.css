@@ -392,6 +392,106 @@
   border-top: 1px solid rgba(255,255,255,0.05);
 }
 
+/* Landing Page Log In / Sign Up Modal */
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 9, 11, 0.88);
+  backdrop-filter: blur(16px);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 200ms ease-out;
+}
+
+.auth-modal.hidden {
+  display: none;
+}
+
+.auth-modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  width: 90%;
+  max-width: 420px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.8);
+}
+
+.auth-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.auth-close-btn:hover {
+  color: #ffffff;
+  border-color: var(--border-strong);
+  transform: scale(1.08);
+}
+
+.auth-modal-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.auth-modal-header p {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.auth-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  gap: 4px;
+}
+
+.auth-tab {
+  flex: 1;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.auth-tab.active {
+  background: var(--surface-hover);
+  color: #ffffff;
+  border: 1px solid var(--border-strong);
+}
+
+.auth-submit-btn {
+  width: 100%;
+  height: 48px;
+  margin-top: var(--space-sm);
+}
+
 /* Top-Right Corner Settings Gear Icon */
 .btn-settings-gear {
   position: absolute;
@@ -557,43 +657,6 @@
   transform: translateX(22px);
 }
 
-/* First-Time Onboarding Setup View */
-.setup-content {
-  width: 100%;
-  max-width: 380px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--space-lg);
-}
-
-.setup-card {
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: var(--space-xl);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-md);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.6);
-}
-
-.setup-avatar {
-  width: 68px;
-  height: 68px;
-  border-radius: 50%;
-  background: var(--surface-hover);
-  border: 2px solid var(--border-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-}
-
 .form-group {
   width: 100%;
   display: flex;
@@ -639,11 +702,6 @@
   height: 18px;
   accent-color: #ffffff;
   cursor: pointer;
-}
-
-.setup-submit-btn {
-  width: 100%;
-  margin-top: var(--space-xs);
 }
 
 /* Landing View */

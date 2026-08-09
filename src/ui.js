@@ -2,7 +2,6 @@ import { STICKERS, TRENDING_GIFS, EMOJI_CATEGORIES } from "./media";
 
 export const views = {
   showcase: document.getElementById("view-showcase"),
-  setup: document.getElementById("view-setup"),
   landing: document.getElementById("view-landing"),
   waiting: document.getElementById("view-waiting"),
   chat: document.getElementById("view-chat")
@@ -11,14 +10,20 @@ export const views = {
 export const buttons = {
   navTour: document.getElementById("btn-nav-tour"),
   navFeatures: document.getElementById("btn-nav-features"),
-  navEnterTop: document.getElementById("btn-nav-enter-top"),
-  enterAppHero: document.getElementById("btn-enter-app-hero"),
+  navLogin: document.getElementById("btn-nav-login"),
+  navSignup: document.getElementById("btn-nav-signup"),
+  heroLogin: document.getElementById("btn-hero-login"),
+  heroSignup: document.getElementById("btn-hero-signup"),
   startTourScroll: document.getElementById("btn-start-tour-scroll"),
   sandboxSound: document.getElementById("btn-sandbox-sound"),
   sandboxVault: document.getElementById("btn-sandbox-vault"),
   sandboxConfetti: document.getElementById("btn-sandbox-confetti"),
   enterConnectFinal: document.getElementById("btn-enter-connect-final"),
-  completeSetup: document.getElementById("btn-complete-setup"),
+  finalLogin: document.getElementById("btn-final-login"),
+  closeAuthModal: document.getElementById("btn-close-auth-modal"),
+  authTabSignup: document.getElementById("btn-auth-tab-signup"),
+  authTabLogin: document.getElementById("btn-auth-tab-login"),
+  submitAuth: document.getElementById("btn-submit-auth"),
   gearLanding: document.getElementById("btn-gear-landing"),
   gearChat: document.getElementById("btn-gear-chat"),
   closeFullscreenSettings: document.getElementById("btn-close-fullscreen-settings"),
@@ -64,10 +69,10 @@ export const buttons = {
 };
 
 export const inputs = {
-  setupUsername: document.getElementById("setup-username"),
-  setupPassword: document.getElementById("setup-password"),
-  setupVaultToggle: document.getElementById("setup-vault-toggle"),
-  setupSoundToggle: document.getElementById("setup-sound-toggle"),
+  authUsername: document.getElementById("auth-username"),
+  authPassword: document.getElementById("auth-password"),
+  authVaultToggle: document.getElementById("auth-vault-toggle"),
+  authSoundToggle: document.getElementById("auth-sound-toggle"),
   settingUsername: document.getElementById("setting-input-username"),
   settingPassword: document.getElementById("setting-input-password"),
   settingToggleVault: document.getElementById("setting-toggle-vault"),
@@ -82,6 +87,11 @@ export const inputs = {
 export const displays = {
   threeBgCanvas: document.getElementById("three-bg-canvas"),
   sandboxPreviewOutput: document.getElementById("sandbox-preview-output"),
+  modalAuthLanding: document.getElementById("modal-auth-landing"),
+  authModalTitle: document.getElementById("auth-modal-title"),
+  authModalDesc: document.getElementById("auth-modal-desc"),
+  authSignupOptions: document.getElementById("auth-signup-options"),
+  authSubmitText: document.getElementById("auth-submit-text"),
   modalSettingsFullscreen: document.getElementById("modal-settings-fullscreen"),
   roomCode: document.getElementById("room-code-display"),
   chatRoomCode: document.getElementById("chat-room-code"),

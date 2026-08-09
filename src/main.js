@@ -76,6 +76,7 @@ let selectedContextMenuMessage = null;
 let voiceRecorder = null;
 let voiceTimerInterval = null;
 let voiceStartTime = 0;
+let currentAuthMode = "signup"; // 'signup' | 'login'
 
 async function init() {
   setupEventListeners();
@@ -114,8 +115,66 @@ function enterConnectApp() {
     updateProfileUI();
     showView("landing");
   } else {
-    showView("setup");
+    openAuthModal("signup");
   }
+}
+
+function openAuthModal(mode = "signup") {
+  currentAuthMode = mode;
+  updateAuthModalUI();
+  displays.modalAuthLanding.classList.remove("hidden");
+  setTimeout(() => inputs.authUsername?.focus(), 100);
+}
+
+function closeAuthModal() {
+  displays.modalAuthLanding.classList.add("hidden");
+}
+
+function updateAuthModalUI() {
+  if (currentAuthMode === "signup") {
+    buttons.authTabSignup.classList.add("active");
+    buttons.authTabLogin.classList.remove("active");
+    displays.authModalTitle.textContent = "Sign Up & Enter Connect";
+    displays.authModalDesc.textContent = "Set your handle & passcode to enter private room sessions.";
+    displays.authSignupOptions.style.display = "block";
+    displays.authSubmitText.textContent = "Sign Up & Enter App";
+
+    inputs.authUsername.value = getUsername() !== "Anonymous" ? getUsername() : "";
+    inputs.authPassword.value = getPassword() || "";
+  } else {
+    buttons.authTabLogin.classList.add("active");
+    buttons.authTabSignup.classList.remove("active");
+    displays.authModalTitle.textContent = "Log In to Connect";
+    displays.authModalDesc.textContent = "Enter your username & PIN code to resume session.";
+    displays.authSignupOptions.style.display = "none";
+    displays.authSubmitText.textContent = "Log In & Enter App";
+
+    inputs.authUsername.value = getUsername() !== "Anonymous" ? getUsername() : "";
+    inputs.authPassword.value = getPassword() || "";
+  }
+}
+
+function handleAuthSubmit() {
+  const uname = inputs.authUsername.value.trim();
+  const pwd = inputs.authPassword.value.trim();
+  const soundOn = inputs.authSoundToggle.checked;
+  const vaultOn = inputs.authVaultToggle.checked;
+
+  if (!uname) {
+    showToast("Please enter a username or handle");
+    return;
+  }
+  if (!pwd) {
+    showToast("Please enter your PIN passcode");
+    return;
+  }
+
+  saveUserSettings(uname, pwd, soundOn, vaultOn);
+  updateProfileUI();
+  closeAuthModal();
+
+  showToast(`Authenticated as @${uname}. Welcome!`);
+  showView("landing");
 }
 
 function updateProfileUI() {
@@ -184,7 +243,37 @@ function handleSendFromVault(vaultMsg) {
 }
 
 function setupEventListeners() {
-  // Showcase Landing Page Navigation & CTAs
+  // Landing Page Log In & Sign Up Controls
+  buttons.navLogin.addEventListener("click", () => {
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("login");
+  });
+
+  buttons.navSignup.addEventListener("click", () => {
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("signup");
+  });
+
+  buttons.heroLogin.addEventListener("click", () => {
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("login");
+  });
+
+  buttons.heroSignup.addEventListener("click", () => {
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("signup");
+  });
+
+  buttons.finalLogin.addEventListener("click", () => {
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("login");
+  });
+
+  buttons.enterConnectFinal.addEventListener("click", () => {
+    if (hasValidSession()) enterConnectApp();
+    else openAuthModal("signup");
+  });
+
   buttons.navTour.addEventListener("click", () => {
     document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
   });
@@ -197,9 +286,17 @@ function setupEventListeners() {
     document.getElementById("section-tour-sandbox")?.scrollIntoView({ behavior: "smooth" });
   });
 
-  buttons.navEnterTop.addEventListener("click", enterConnectApp);
-  buttons.enterAppHero.addEventListener("click", enterConnectApp);
-  buttons.enterConnectFinal.addEventListener("click", enterConnectApp);
+  // Auth Modal Event Handlers
+  buttons.closeAuthModal.addEventListener("click", closeAuthModal);
+  buttons.authTabSignup.addEventListener("click", () => {
+    currentAuthMode = "signup";
+    updateAuthModalUI();
+  });
+  buttons.authTabLogin.addEventListener("click", () => {
+    currentAuthMode = "login";
+    updateAuthModalUI();
+  });
+  buttons.submitAuth.addEventListener("click", handleAuthSubmit);
 
   // Showcase Interactive Tour Sandbox Demos
   buttons.sandboxSound.addEventListener("click", () => {
@@ -232,28 +329,6 @@ function setupEventListeners() {
         🎉 Confetti Burst effect triggered!
       </div>
     `;
-  });
-
-  // First-Time Onboarding Completion
-  buttons.completeSetup.addEventListener("click", () => {
-    const uname = inputs.setupUsername.value.trim();
-    const pwd = inputs.setupPassword.value.trim();
-    const soundOn = inputs.setupSoundToggle.checked;
-    const vaultOn = inputs.setupVaultToggle.checked;
-
-    if (!uname) {
-      showToast("Please enter a username or handle");
-      return;
-    }
-    if (!pwd) {
-      showToast("Please set a private key / password");
-      return;
-    }
-
-    saveUserSettings(uname, pwd, soundOn, vaultOn);
-    updateProfileUI();
-    showToast(`Welcome @${uname}! Profile setup complete.`);
-    showView("landing");
   });
 
   // Top-Right Corner Settings Gear Buttons
