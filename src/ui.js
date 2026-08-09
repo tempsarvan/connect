@@ -371,6 +371,38 @@ function parseFormattedText(text, isSpoiler = false) {
   return html;
 }
 
+export function triggerConfettiEffect() {
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.inset = "0";
+  container.style.pointerEvents = "none";
+  container.style.zIndex = "350";
+  document.body.appendChild(container);
+
+  const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement("div");
+    piece.style.position = "absolute";
+    piece.style.width = `${Math.random() * 8 + 6}px`;
+    piece.style.height = `${Math.random() * 8 + 6}px`;
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.left = `${Math.random() * 100}vw`;
+    piece.style.top = `-20px`;
+    piece.style.borderRadius = "2px";
+    piece.style.opacity = Math.random() + 0.5;
+    piece.style.transition = `all ${Math.random() * 1.5 + 1}s ease-out`;
+
+    container.appendChild(piece);
+
+    setTimeout(() => {
+      piece.style.transform = `translate3d(${(Math.random() - 0.5) * 200}px, ${window.innerHeight + 50}px, 0) rotate(${Math.random() * 720}deg)`;
+      piece.style.opacity = "0";
+    }, 20);
+  }
+
+  setTimeout(() => container.remove(), 2500);
+}
+
 export function renderMessages(messages, currentUid, onReactionClick, onReplyClick) {
   displays.messagesList.innerHTML = "";
 
@@ -400,7 +432,18 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
 
-    if (msg.mediaType === "file" && msg.mediaUrl) {
+    if (msg.mediaType === "sound_fx") {
+      const card = document.createElement("div");
+      card.className = "msg-file-card";
+      card.innerHTML = `
+        <div class="msg-file-icon">🔊</div>
+        <div class="msg-file-info">
+          <span class="msg-file-name">${msg.text || "Sound FX"}</span>
+          <span class="msg-file-size">Live Soundboard Audio</span>
+        </div>
+      `;
+      bubble.appendChild(card);
+    } else if (msg.mediaType === "file" && msg.mediaUrl) {
       const card = document.createElement("div");
       card.className = "msg-file-card";
       card.innerHTML = `

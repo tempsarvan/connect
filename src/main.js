@@ -42,6 +42,7 @@ import {
   initMediaPopovers,
   initEmojiPanel,
   initDoodleStudio,
+  triggerConfettiEffect,
   showReplyPreview,
   hideReplyPreview,
   closeLightbox,
@@ -169,11 +170,17 @@ function setupEventListeners() {
   });
 
   document.querySelectorAll(".sound-fx-btn").forEach((btn) => {
-    btn.onclick = () => {
+    btn.onclick = async () => {
       const fx = btn.getAttribute("data-fx");
-      soundEngine.playSoundFX(fx);
-      showToast(`Sound FX: ${btn.textContent}`);
       displays.popoverSoundboard.classList.add("hidden");
+      
+      if (currentRoomCode) {
+        await sendMessage(currentRoomCode, currentUid, {
+          text: `🔊 Sound FX: ${btn.textContent}`,
+          mediaType: "sound_fx",
+          soundFx: fx
+        });
+      }
     };
   });
 
@@ -309,10 +316,22 @@ function startChatSession() {
   let previousMsgCount = 0;
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
-    if (messages.length > previousMsgCount && previousMsgCount > 0) {
+    if (messages.length > previousMsgCount) {
       const lastMsg = messages[messages.length - 1];
-      if (lastMsg.sender !== currentUid) {
-        soundEngine.playMessageDing();
+
+      // Handle Soundboard FX playback for both sender and recipient
+      if (lastMsg.mediaType === "sound_fx" && lastMsg.soundFx) {
+        soundEngine.playSoundFX(lastMsg.soundFx);
+      }
+
+      // Handle Confetti effect for both sender and recipient
+      if (lastMsg.effectMode === "confetti") {
+        triggerConfettiEffect();
+      }
+
+      // Handle Notifications & Chimes
+      if (previousMsgCount > 0 && lastMsg.sender !== currentUid) {
+        if (lastMsg.mediaType !== "sound_fx") soundEngine.playMessageDing();
         
         let notifText = lastMsg.text;
         if (lastMsg.mediaType === "image") notifText = "Sent a photo";

@@ -46,8 +46,12 @@ export async function sendMessage(roomCode, uid, payload) {
   const mediaType = typeof payload === "object" ? payload.mediaType || "text" : "text";
   const mediaUrl = typeof payload === "object" ? payload.mediaUrl || null : null;
   const replyTo = typeof payload === "object" ? payload.replyTo || null : null;
+  const effectMode = typeof payload === "object" ? payload.effectMode || "normal" : "normal";
+  const fileName = typeof payload === "object" ? payload.fileName || null : null;
+  const fileSize = typeof payload === "object" ? payload.fileSize || null : null;
+  const soundFx = typeof payload === "object" ? payload.soundFx || null : null;
 
-  if (!text.trim() && !mediaUrl) return;
+  if (!text.trim() && !mediaUrl && !soundFx) return;
 
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgId = "msg_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
@@ -59,10 +63,14 @@ export async function sendMessage(roomCode, uid, payload) {
     mediaType,
     mediaUrl,
     replyTo,
+    effectMode,
+    fileName,
+    fileSize,
+    soundFx,
     reactions: {},
     localTime: timeStr,
     timestamp: Date.now(),
-    isNew: true // Flag for popping up animation from typebar
+    isNew: true
   };
 
   // 1. Instantly store locally & trigger synchronous UI render for sender!
@@ -86,6 +94,10 @@ export async function sendMessage(roomCode, uid, payload) {
       mediaType,
       mediaUrl,
       replyTo,
+      effectMode,
+      fileName,
+      fileSize,
+      soundFx,
       reactions: {},
       localTime: timeStr,
       timestamp: serverTimestamp()
@@ -185,6 +197,10 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
                 mediaType: data.mediaType || "text",
                 mediaUrl: data.mediaUrl || null,
                 replyTo: data.replyTo || null,
+                effectMode: data.effectMode || "normal",
+                fileName: data.fileName || null,
+                fileSize: data.fileSize || null,
+                soundFx: data.soundFx || null,
                 reactions: data.reactions || {},
                 localTime: timeStr,
                 timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
