@@ -262,6 +262,90 @@
   border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Work in Progress (WIP) Calling Modal */
+.wip-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 9, 11, 0.88);
+  backdrop-filter: blur(14px);
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 180ms ease-out;
+}
+
+.wip-modal.hidden {
+  display: none;
+}
+
+.wip-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  max-width: 380px;
+  width: 90%;
+  position: relative;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.7);
+}
+
+.wip-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.wip-close-btn:hover {
+  color: #ffffff;
+  border-color: var(--border-strong);
+  transform: scale(1.08);
+}
+
+.wip-img {
+  width: 180px;
+  height: 180px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  border: 1px solid var(--border);
+}
+
+.wip-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.wip-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.wip-action-btn {
+  width: 100%;
+  margin-top: var(--space-xs);
+}
+
 /* Notifications Badge */
 .btn-notifications {
   position: relative;
@@ -739,229 +823,6 @@
   font-size: 0.68rem;
   color: var(--text-dim);
   margin-top: 2px;
-}
-
-/* Incoming Call Modal */
-.incoming-call-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(9, 9, 11, 0.85);
-  backdrop-filter: blur(12px);
-  z-index: 250;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.incoming-call-modal.hidden {
-  display: none;
-}
-
-.incoming-call-card {
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: var(--space-xl);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-md);
-  max-width: 320px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.6);
-  position: relative;
-}
-
-.pulse-ring {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: var(--surface-hover);
-  border: 2px solid var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: pulse 1.5s infinite ease-in-out;
-}
-
-.incoming-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.incoming-subtitle {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-
-.incoming-actions {
-  display: flex;
-  gap: var(--space-md);
-  margin-top: var(--space-sm);
-  width: 100%;
-}
-
-.btn-call-accept {
-  flex: 1;
-  background: var(--success);
-  color: #fff;
-}
-
-.btn-call-decline {
-  flex: 1;
-  background: var(--danger);
-  color: #fff;
-}
-
-/* Ultra-Premium Call Overlay HUD */
-.call-overlay {
-  position: fixed;
-  inset: 0;
-  background: #09090b;
-  z-index: 300;
-  display: flex;
-  flex-direction: column;
-  animation: fadeIn 200ms ease-out;
-}
-
-.call-overlay.hidden {
-  display: none;
-}
-
-.call-top-bar {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  z-index: 20;
-}
-
-.call-security-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(18, 18, 21, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-strong);
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.lock-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 8px var(--success);
-}
-
-.call-video-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000000;
-}
-
-.remote-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.local-video {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 150px;
-  height: 100px;
-  border-radius: var(--radius-md);
-  border: 2px solid var(--border-strong);
-  object-fit: cover;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.7);
-  z-index: 10;
-  background: #18181b;
-}
-
-.local-video.hidden {
-  display: none;
-}
-
-.audio-call-avatar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.audio-call-avatar.hidden {
-  display: none;
-}
-
-.avatar-circle {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 2px solid var(--border-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 32px rgba(255,255,255,0.1);
-}
-
-.call-status-text {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.call-control-bar {
-  position: absolute;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(24, 24, 27, 0.92);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-full);
-  padding: 8px 24px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  z-index: 20;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-}
-
-.btn-call-ctrl {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-call-ctrl:hover {
-  transform: scale(1.08);
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
-}
-
-.btn-call-end {
-  background: var(--danger);
-  border-color: var(--danger-hover);
-}
-
-.btn-call-end:hover {
-  background: var(--danger-hover);
 }
 
 /* Reply Preview & Input Bar */

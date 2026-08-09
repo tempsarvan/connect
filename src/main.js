@@ -28,7 +28,6 @@ import {
   clearNotifications, 
   listenToNotifications 
 } from "./notifications";
-import { callManager } from "./call";
 import { 
   views, 
   buttons, 
@@ -43,7 +42,9 @@ import {
   initMediaPopovers,
   showReplyPreview,
   hideReplyPreview,
-  closeLightbox
+  closeLightbox,
+  showWipModal,
+  hideWipModal
 } from "./ui";
 
 let currentRoomCode = null;
@@ -57,8 +58,6 @@ let voiceRecorder = null;
 let voiceTimerInterval = null;
 let voiceStartTime = 0;
 let typingTimeout = null;
-let pendingIncomingOffer = null;
-let pendingCallIsVideo = true;
 
 async function init() {
   setupEventListeners();
@@ -146,32 +145,19 @@ function setupEventListeners() {
     clearNotifications();
   });
 
-  // Calling Handlers
-  buttons.audioCall.addEventListener("click", () => handleStartCall(false));
-  buttons.videoCall.addEventListener("click", () => handleStartCall(true));
-  buttons.acceptCall.addEventListener("click", handleAcceptCall);
-  buttons.declineCall.addEventListener("click", handleDeclineCall);
-
-  buttons.callToggleMic.addEventListener("click", () => {
-    const isMuted = callManager.toggleMic();
-    buttons.callToggleMic.style.background = isMuted ? "var(--danger)" : "var(--surface)";
-    showToast(isMuted ? "Microphone Muted" : "Microphone Active");
+  // Calling WIP Modal Handlers (Displays WIP graphic when either call button is clicked)
+  buttons.audioCall.addEventListener("click", () => {
+    addNotification("Voice Call", "Feature under construction", "📞");
+    showWipModal();
   });
 
-  buttons.callToggleCam.addEventListener("click", () => {
-    const isOff = callManager.toggleCamera();
-    buttons.callToggleCam.style.background = isOff ? "var(--danger)" : "var(--surface)";
-    showToast(isOff ? "Camera Off" : "Camera On");
+  buttons.videoCall.addEventListener("click", () => {
+    addNotification("Video Call", "Feature under construction", "📹");
+    showWipModal();
   });
 
-  buttons.callFlipCam.addEventListener("click", () => {
-    callManager.flipCamera();
-    showToast("Flipping Camera...");
-  });
-
-  buttons.callEnd.addEventListener("click", () => {
-    callManager.stopCall("Call ended");
-  });
+  buttons.closeWip.addEventListener("click", hideWipModal);
+  buttons.dismissWip.addEventListener("click", hideWipModal);
 
   // Voice Recorder
   buttons.recordVoice.addEventListener("click", handleToggleVoiceRecord);
@@ -258,59 +244,6 @@ function startChatSession() {
 
   addNotification("Room Active", `Connected to room ${currentRoomCode}`, "🔒");
 
-  callManager.init(currentRoomCode, currentUid);
-
-  callManager.onIncomingCall = ({ senderUid, isVideo, offer }) => {
-    pendingIncomingOffer = offer;
-    pendingCallIsVideo = isVideo;
-
-    soundEngine.playRingtone();
-    addNotification("Incoming Call", `${isVideo ? "Video" : "Voice"} call request`, "📞");
-
-    displays.incomingCallTitle.textContent = `Incoming ${isVideo ? "Video" : "Voice"} Call...`;
-    displays.incomingCallModal.classList.remove("hidden");
-  };
-
-  callManager.onCallStateChange = ({ status, localStream, reason }) => {
-    if (status === "requesting_permissions") {
-      showToast("Requesting microphone/camera permissions...");
-    } else if (status === "calling" || status === "connected") {
-      displays.callOverlay.classList.remove("hidden");
-      
-      if (localStream) {
-        displays.localVideo.srcObject = localStream;
-        displays.localVideo.play().catch(() => {});
-      }
-
-      if (!callManager.isVideo) {
-        displays.localVideo.classList.add("hidden");
-        displays.audioCallAvatar.classList.remove("hidden");
-        displays.remoteVideo.classList.add("hidden");
-      } else {
-        displays.localVideo.classList.remove("hidden");
-        displays.audioCallAvatar.classList.add("hidden");
-        displays.remoteVideo.classList.remove("hidden");
-      }
-    } else if (status === "ended") {
-      displays.callOverlay.classList.add("hidden");
-      displays.incomingCallModal.classList.add("hidden");
-      displays.localVideo.srcObject = null;
-      displays.remoteVideo.srcObject = null;
-      displays.remoteAudio.srcObject = null;
-      if (reason) showToast(reason);
-    }
-  };
-
-  callManager.onRemoteStream = (remoteStream) => {
-    if (callManager.isVideo) {
-      displays.remoteVideo.srcObject = remoteStream;
-      displays.remoteVideo.play().catch(() => {});
-    } else {
-      displays.remoteAudio.srcObject = remoteStream;
-      displays.remoteAudio.play().catch(() => {});
-    }
-  };
-
   let previousMsgCount = 0;
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
@@ -347,35 +280,6 @@ function startChatSession() {
       onSessionEnded();
     }
   });
-}
-
-// Call Action Handlers
-async function handleStartCall(isVideo) {
-  if (!currentRoomCode || !currentUid) return;
-  try {
-    addNotification("Starting Call", `Calling peer...`, "📞");
-    await callManager.startCall(currentRoomCode, currentUid, isVideo);
-  } catch (err) {
-    showToast(err.message || "Failed to start call.");
-  }
-}
-
-async function handleAcceptCall() {
-  displays.incomingCallModal.classList.add("hidden");
-  if (!currentRoomCode || !currentUid || !pendingIncomingOffer) return;
-
-  try {
-    await callManager.acceptCall(currentRoomCode, currentUid, pendingCallIsVideo, pendingIncomingOffer);
-  } catch (err) {
-    showToast("Could not accept call: " + err.message);
-  }
-}
-
-function handleDeclineCall() {
-  displays.incomingCallModal.classList.add("hidden");
-  if (currentRoomCode && currentUid) {
-    callManager.declineCall(currentRoomCode, currentUid);
-  }
 }
 
 // Chat Action Handlers
@@ -506,7 +410,6 @@ async function handleCancelRoom() {
 
 async function handleEndSession() {
   if (currentRoomCode) {
-    callManager.stopCall();
     await destroyRoomSession(currentRoomCode);
   }
   onSessionEnded();
@@ -514,7 +417,6 @@ async function handleEndSession() {
 
 function onSessionEnded() {
   unregisterUnloadCleanup();
-  callManager.stopCall();
 
   if (chatUnsubscribe) {
     chatUnsubscribe();
@@ -538,7 +440,6 @@ function handleReturnHome() {
 
 function resetAppState() {
   unregisterUnloadCleanup();
-  callManager.stopCall();
   currentRoomCode = null;
   currentReplyMessage = null;
   
@@ -561,6 +462,7 @@ function resetAppState() {
   buttons.join.disabled = false;
   displays.messagesList.innerHTML = "";
   hideReplyPreview();
+  hideWipModal();
   displays.popoverGifs.classList.add("hidden");
   displays.popoverStickers.classList.add("hidden");
   displays.popoverNotifications.classList.add("hidden");

@@ -26,12 +26,8 @@ export const buttons = {
   clearNotifications: document.getElementById("btn-clear-notifications"),
   audioCall: document.getElementById("btn-audio-call"),
   videoCall: document.getElementById("btn-video-call"),
-  acceptCall: document.getElementById("btn-accept-call"),
-  declineCall: document.getElementById("btn-decline-call"),
-  callToggleMic: document.getElementById("btn-call-toggle-mic"),
-  callToggleCam: document.getElementById("btn-call-toggle-cam"),
-  callFlipCam: document.getElementById("btn-call-flip-cam"),
-  callEnd: document.getElementById("btn-call-end")
+  closeWip: document.getElementById("btn-close-wip"),
+  dismissWip: document.getElementById("btn-dismiss-wip")
 };
 
 export const inputs = {
@@ -61,14 +57,7 @@ export const displays = {
   popoverNotifications: document.getElementById("popover-notifications"),
   notificationsList: document.getElementById("notifications-list"),
   notifBadge: document.getElementById("notif-badge"),
-  incomingCallModal: document.getElementById("incoming-call-modal"),
-  incomingCallTitle: document.getElementById("incoming-call-title"),
-  callOverlay: document.getElementById("call-overlay"),
-  remoteVideo: document.getElementById("remote-video"),
-  remoteAudio: document.getElementById("remote-audio"),
-  localVideo: document.getElementById("local-video"),
-  audioCallAvatar: document.getElementById("audio-call-avatar"),
-  callStatusText: document.getElementById("call-status-text")
+  wipModal: document.getElementById("wip-modal")
 };
 
 let toastTimeout = null;
@@ -110,6 +99,14 @@ export function openLightbox(src) {
 export function closeLightbox() {
   displays.lightboxModal.classList.add("hidden");
   displays.lightboxImg.src = "";
+}
+
+export function showWipModal() {
+  displays.wipModal.classList.remove("hidden");
+}
+
+export function hideWipModal() {
+  displays.wipModal.classList.add("hidden");
 }
 
 export function showReplyPreview(msgText) {
