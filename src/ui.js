@@ -1,4 +1,4 @@
-import { PUBLIC_ROOMS } from "./chat";
+import { PUBLIC_ROOMS, getProfileBio, getCustomStatus, getProfileBannerColor } from "./chat";
 
 export const views = {
   showcase: document.getElementById("view-showcase"),
@@ -34,6 +34,11 @@ export const buttons = {
   leavePublicWorkspace: document.getElementById("btn-leave-public-workspace"),
   toggleMembersSidebar: document.getElementById("btn-toggle-members-sidebar"),
   discordSend: document.getElementById("btn-discord-send"),
+  customizeProfileQuick: document.getElementById("btn-customize-profile-quick"),
+  closeProfileCard: document.getElementById("btn-close-profile-card"),
+  editProfileFromCard: document.getElementById("btn-edit-profile-from-card"),
+  closeEditProfile: document.getElementById("btn-close-edit-profile"),
+  saveProfileCustomization: document.getElementById("btn-save-profile-customization"),
   gearLanding: document.getElementById("btn-gear-landing"),
   gearChat: document.getElementById("btn-gear-chat"),
   closeFullscreenSettings: document.getElementById("btn-close-fullscreen-settings"),
@@ -57,6 +62,8 @@ export const inputs = {
   authVaultToggle: document.getElementById("auth-vault-toggle"),
   authSoundToggle: document.getElementById("auth-sound-toggle"),
   addFriendHandle: document.getElementById("input-add-friend-handle"),
+  profileBioInput: document.getElementById("profile-bio-input"),
+  profileStatusInput: document.getElementById("profile-status-input"),
   settingUsername: document.getElementById("setting-input-username"),
   settingPassword: document.getElementById("setting-input-password"),
   code: document.getElementById("input-code"),
@@ -89,6 +96,13 @@ export const displays = {
   discordMembersList: document.getElementById("discord-members-list"),
   discordMembersSidebar: document.getElementById("discord-members-sidebar"),
   discordMyUsername: document.getElementById("discord-my-username"),
+  discordMyStatus: document.getElementById("discord-my-status"),
+  modalProfileCard: document.getElementById("modal-profile-card"),
+  profileCardBanner: document.getElementById("profile-card-banner"),
+  profileCardHandle: document.getElementById("profile-card-handle"),
+  profileCardStatus: document.getElementById("profile-card-status"),
+  profileCardBio: document.getElementById("profile-card-bio"),
+  modalEditProfile: document.getElementById("modal-edit-profile"),
   modalSettingsFullscreen: document.getElementById("modal-settings-fullscreen"),
   roomCode: document.getElementById("room-code-display"),
   chatRoomCode: document.getElementById("chat-room-code"),
@@ -148,6 +162,25 @@ export function closeLightbox() {
   displays.lightboxImg.src = "";
 }
 
+export function openProfileCardModal(username, isMe = true, onEditClick = null) {
+  displays.profileCardHandle.textContent = username;
+  displays.profileCardStatus.textContent = getCustomStatus();
+  displays.profileCardBio.textContent = getProfileBio();
+  displays.profileCardBanner.style.background = getProfileBannerColor();
+
+  if (isMe) {
+    buttons.editProfileFromCard.style.display = "block";
+    buttons.editProfileFromCard.onclick = () => {
+      displays.modalProfileCard.classList.add("hidden");
+      if (onEditClick) onEditClick();
+    };
+  } else {
+    buttons.editProfileFromCard.style.display = "none";
+  }
+
+  displays.modalProfileCard.classList.remove("hidden");
+}
+
 export function renderFriendsList(friends, onRemove, onStartPrivateChat) {
   displays.friendsListContainer.innerHTML = "";
   if (friends.length === 0) {
@@ -180,7 +213,6 @@ export function renderPublicRoomsExplorer(onJoinChannel) {
   displays.publicChannelsListPreview.innerHTML = "";
 
   PUBLIC_ROOMS.forEach((room) => {
-    // 1. Explorer Modal List Item
     const card = document.createElement("div");
     card.className = "explorer-room-card";
     card.innerHTML = `
@@ -193,7 +225,6 @@ export function renderPublicRoomsExplorer(onJoinChannel) {
     card.querySelector(".btn-join-pub").onclick = () => onJoinChannel(room);
     displays.publicRoomsExplorerList.appendChild(card);
 
-    // 2. Landing Main Hub Quick Preview Buttons
     const prevBtn = document.createElement("div");
     prevBtn.className = "channel-preview-btn";
     prevBtn.innerHTML = `
@@ -220,7 +251,7 @@ export function renderDiscordChannelsList(activeChannelId, onSelectChannel) {
   });
 }
 
-export function renderDiscordMembers(myUsername, friends) {
+export function renderDiscordMembers(myUsername, friends, onMemberClick = null) {
   displays.discordMembersList.innerHTML = "";
   
   const allMembers = [myUsername, ...friends, "@alex", "@dev_master", "@cyber_pilot"];
@@ -235,49 +266,8 @@ export function renderDiscordMembers(myUsername, friends) {
       </div>
       <span style="font-size:0.82rem; color:${name === myUsername ? '#60a5fa' : 'var(--text)'}">${name} ${name === myUsername ? '(You)' : ''}</span>
     `;
+    if (onMemberClick) item.onclick = () => onMemberClick(name);
     displays.discordMembersList.appendChild(item);
-  });
-}
-
-export function renderSavedVault(savedMessages, onRemoveSaved, onSendFromVault, isVaultDisabled = false) {
-  displays.savedVaultList.innerHTML = "";
-  if (isVaultDisabled) {
-    displays.savedVaultList.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--danger); font-size: 0.8rem;">⚠️ Vault Memory is turned off by room session settings</div>`;
-    return;
-  }
-  if (savedMessages.length === 0) {
-    displays.savedVaultList.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.8rem;">No saved vault messages yet</div>`;
-    return;
-  }
-
-  savedMessages.forEach((msg) => {
-    const item = document.createElement("div");
-    item.className = "saved-vault-item";
-    
-    let contentPreview = msg.text;
-    if (msg.mediaType === 'image') contentPreview = '[Photo Attachment]';
-    else if (msg.mediaType === 'audio') contentPreview = '[Voice Note]';
-    else if (msg.mediaType === 'gif') contentPreview = '[Animated GIF]';
-    else if (msg.mediaType === 'sticker') contentPreview = '[Sticker]';
-    else if (msg.mediaType === 'file') contentPreview = `[Document: ${msg.fileName || ''}]`;
-
-    item.innerHTML = `
-      <div class="saved-vault-header">
-        <span>By ${msg.senderName || 'Peer'} • ${msg.vaultSavedAt || msg.localTime || ''}</span>
-      </div>
-      <div class="saved-vault-text">${contentPreview}</div>
-      <div class="saved-vault-actions">
-        <button class="btn-send-vault">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          <span>Send into Chat</span>
-        </button>
-        <button class="btn-remove-saved">Remove ✕</button>
-      </div>
-    `;
-
-    item.querySelector(".btn-send-vault").onclick = () => onSendFromVault(msg);
-    item.querySelector(".btn-remove-saved").onclick = () => onRemoveSaved(msg.id);
-    displays.savedVaultList.appendChild(item);
   });
 }
 

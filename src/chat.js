@@ -25,6 +25,11 @@ export const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
 
 let currentUsername = localStorage.getItem("connect_username") || "";
 let currentPassword = localStorage.getItem("connect_password") || "";
+let profileBio = localStorage.getItem("connect_profile_bio") || "Exploring Connect zero-trace communications suite.";
+let customStatus = localStorage.getItem("connect_custom_status") || "Online & Connected";
+let profileBannerColor = localStorage.getItem("connect_profile_banner") || "#3b82f6";
+let profileAvatarIcon = localStorage.getItem("connect_avatar_icon") || "code";
+
 let isSoundEnabled = localStorage.getItem("connect_sound_enabled") !== "false";
 let isVaultEnabled = localStorage.getItem("connect_vault_enabled") !== "false";
 let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
@@ -64,11 +69,9 @@ export async function claimUniqueUsername(username, uid) {
     throw new Error(`Username ${handle} is already claimed by another user. Please choose a different handle.`);
   }
 
-  // Claim locally
   registeredUsernames[handle] = uid;
   localStorage.setItem("connect_registered_usernames", JSON.stringify(registeredUsernames));
 
-  // Claim in Firestore if configured
   if (isConfigured) {
     try {
       const userRef = doc(db, "usernames", handle);
@@ -136,6 +139,36 @@ export function saveUserSettings(name, password, soundOn = true, vaultOn = true,
   }
 
   return { username: currentUsername, password: currentPassword, soundEnabled: isSoundEnabled, vaultEnabled: isVaultEnabled };
+}
+
+export function saveProfileCustomization(bio, status, bannerColor, avatarIcon) {
+  profileBio = bio.trim() || "Exploring Connect zero-trace communications suite.";
+  customStatus = status.trim() || "Online & Connected";
+  profileBannerColor = bannerColor || "#3b82f6";
+  profileAvatarIcon = avatarIcon || "code";
+
+  localStorage.setItem("connect_profile_bio", profileBio);
+  localStorage.setItem("connect_custom_status", customStatus);
+  localStorage.setItem("connect_profile_banner", profileBannerColor);
+  localStorage.setItem("connect_avatar_icon", profileAvatarIcon);
+
+  return { bio: profileBio, status: customStatus, bannerColor: profileBannerColor, avatarIcon: profileAvatarIcon };
+}
+
+export function getProfileBio() {
+  return profileBio;
+}
+
+export function getCustomStatus() {
+  return customStatus;
+}
+
+export function getProfileBannerColor() {
+  return profileBannerColor;
+}
+
+export function getProfileAvatarIcon() {
+  return profileAvatarIcon;
 }
 
 export function getUsername() {
@@ -207,7 +240,6 @@ export function addFriend(friendHandle) {
   friendsList.push(handle);
   localStorage.setItem("connect_friends_list", JSON.stringify(friendsList));
 
-  // Auto-register friend handle in local registry if missing
   if (!registeredUsernames[handle]) {
     registeredUsernames[handle] = `uid_${handle.replace('@', '')}`;
     localStorage.setItem("connect_registered_usernames", JSON.stringify(registeredUsernames));

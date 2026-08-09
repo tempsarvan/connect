@@ -11,6 +11,10 @@ import {
   hasValidSession,
   touchSession,
   saveUserSettings,
+  saveProfileCustomization,
+  getProfileBio,
+  getCustomStatus,
+  getProfileBannerColor,
   getUsername,
   getPassword,
   getFriends,
@@ -40,6 +44,7 @@ import {
   renderPublicRoomsExplorer,
   renderDiscordChannelsList,
   renderDiscordMembers,
+  openProfileCardModal,
   closeLightbox
 } from "./ui";
 import { initThreeShowcase } from "./showcase3d";
@@ -52,6 +57,7 @@ let publicChatUnsubscribe = null;
 
 let activePublicChannel = PUBLIC_ROOMS[0];
 let currentAuthMode = "signup";
+let selectedBannerColor = getProfileBannerColor();
 
 async function init() {
   setupEventListeners();
@@ -62,19 +68,16 @@ async function init() {
     currentUid = getUserUid();
   }
 
-  // Initialize Three.js 3D Canvas
   if (displays.threeBgCanvas) {
     initThreeShowcase(displays.threeBgCanvas);
   }
 
-  // Showcase view first
   showView("showcase");
 
   if (hasValidSession()) {
     touchSession();
   }
 
-  // Initial Public Rooms & Friends List render
   updateFriendsUI();
   updatePublicRoomsUI();
 }
@@ -161,6 +164,34 @@ function updateProfileUI() {
   displays.landingUsernameLabel.textContent = uname;
   displays.chatHeaderUsername.textContent = uname;
   displays.discordMyUsername.textContent = uname;
+  displays.discordMyStatus.textContent = getCustomStatus();
+}
+
+function openEditProfileStudio() {
+  inputs.profileBioInput.value = getProfileBio();
+  inputs.profileStatusInput.value = getCustomStatus();
+  selectedBannerColor = getProfileBannerColor();
+
+  document.querySelectorAll(".banner-swatch").forEach((swatch) => {
+    if (swatch.dataset.color === selectedBannerColor) swatch.classList.add("active");
+    else swatch.classList.remove("active");
+  });
+
+  displays.modalEditProfile.classList.remove("hidden");
+}
+
+function closeEditProfileStudio() {
+  displays.modalEditProfile.classList.add("hidden");
+}
+
+function handleSaveProfileCustomization() {
+  const bio = inputs.profileBioInput.value;
+  const status = inputs.profileStatusInput.value;
+
+  saveProfileCustomization(bio, status, selectedBannerColor, "code");
+  updateProfileUI();
+  closeEditProfileStudio();
+  showToast("Profile customization saved!");
 }
 
 function updateFriendsUI() {
@@ -174,7 +205,7 @@ function updateFriendsUI() {
     },
     (friendHandle) => {
       displays.modalFriendsList.classList.add("hidden");
-      handleCreateRoom(); // Start private room session with friend
+      handleCreateRoom();
       showToast(`Starting private room for ${friendHandle}...`);
     }
   );
@@ -197,7 +228,11 @@ function openPublicWorkspace(channel = PUBLIC_ROOMS[0]) {
     openPublicWorkspace(selectedChan);
   });
 
-  renderDiscordMembers(getUsername(), getFriends());
+  renderDiscordMembers(getUsername(), getFriends(), (memberName) => {
+    const isMe = memberName === getUsername();
+    openProfileCardModal(memberName, isMe, openEditProfileStudio);
+  });
+
   showView("publicWorkspace");
 
   if (publicChatUnsubscribe) publicChatUnsubscribe();
@@ -250,7 +285,7 @@ function setupEventListeners() {
     document.getElementById("section-tour-sandbox")?.scrollIntoView({ behavior: "smooth" });
   });
 
-  // Auth Modal Event Handlers
+  // Auth Modal Handlers
   buttons.closeAuthModal.addEventListener("click", closeAuthModal);
   buttons.authTabSignup.addEventListener("click", () => {
     currentAuthMode = "signup";
@@ -261,6 +296,20 @@ function setupEventListeners() {
     updateAuthModalUI();
   });
   buttons.submitAuth.addEventListener("click", handleAuthSubmit);
+
+  // Profile Customization Studio Handlers
+  buttons.customizeProfileQuick.addEventListener("click", openEditProfileStudio);
+  buttons.closeProfileCard.addEventListener("click", () => displays.modalProfileCard.classList.add("hidden"));
+  buttons.closeEditProfile.addEventListener("click", closeEditProfileStudio);
+  buttons.saveProfileCustomization.addEventListener("click", handleSaveProfileCustomization);
+
+  document.querySelectorAll(".banner-swatch").forEach((swatch) => {
+    swatch.addEventListener("click", () => {
+      document.querySelectorAll(".banner-swatch").forEach((s) => s.classList.remove("active"));
+      swatch.classList.add("active");
+      selectedBannerColor = swatch.dataset.color;
+    });
+  });
 
   // Friends List Drawer Handlers
   buttons.friendsDrawer.addEventListener("click", () => {
@@ -347,11 +396,13 @@ function setupEventListeners() {
   buttons.endSession.addEventListener("click", handleEndSession);
   buttons.returnHome.addEventListener("click", handleReturnHome);
 
+  // Profile Cards on Header Pills
+  buttons.profileLanding.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
+  buttons.profileHeader.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
+
   // Settings Gear
   buttons.gearLanding.addEventListener("click", openFullscreenSettings);
   buttons.gearChat.addEventListener("click", openFullscreenSettings);
-  buttons.profileLanding.addEventListener("click", openFullscreenSettings);
-  buttons.profileHeader.addEventListener("click", openFullscreenSettings);
   buttons.closeFullscreenSettings.addEventListener("click", closeFullscreenSettings);
   buttons.saveFullscreenSettings.addEventListener("click", handleSaveSettings);
 
@@ -364,7 +415,7 @@ function setupEventListeners() {
     }
   });
 
-  // 1 Terabyte (1 TB) File Upload Handlers (Private & Public Chat)
+  // File Upload Handlers
   inputs.fileUpload.addEventListener("change", (e) => handleFileUpload(e, currentRoomCode));
   inputs.pubFileUpload.addEventListener("change", (e) => handleFileUpload(e, activePublicChannel?.id));
 
@@ -454,7 +505,6 @@ async function handleFileUpload(e, targetRoomId) {
   const file = e.target.files[0];
   if (!file || !targetRoomId) return;
 
-  // Validate File Size against 1 TB Limit (1,099,511,627,776 Bytes)
   if (file.size > MAX_FILE_SIZE_BYTES) {
     showToast("File exceeds maximum 1 Terabyte (1 TB) size limit.");
     e.target.value = "";
