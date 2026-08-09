@@ -12,10 +12,12 @@ import {
 } from "firebase/firestore";
 
 let roomChannel = null;
+let globalEventsChannel = null;
 const messageStore = new Map();
-const typingUsers = new Map(); // uid -> { isTyping, textLength }
+const typingUsers = new Map();
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
+let roomNotificationListeners = new Set();
 
 // Persistent Device Session (3 Days Inactivity Expiry Threshold)
 const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -39,14 +41,27 @@ let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '["
 
 let peerVaultDisabled = false;
 
-// Default Public Rooms / Channels
-export const PUBLIC_ROOMS = [
+// Dynamic Public Rooms Directory
+export let publicRooms = JSON.parse(localStorage.getItem("connect_public_rooms") || JSON.stringify([
   { id: "pub_general", name: "#general", topic: "General discussion & community lounge", membersCount: 142 },
   { id: "pub_tech", name: "#tech-lounge", topic: "Technology, AI, & software engineering", membersCount: 89 },
   { id: "pub_gaming", name: "#gaming", topic: "Gaming, esports, & streaming", membersCount: 64 },
   { id: "pub_music", name: "#music-beats", topic: "Music, playlists, & audio production", membersCount: 51 },
   { id: "pub_announcements", name: "#announcements", topic: "Official Connect updates & news", membersCount: 310 }
-];
+]));
+
+export function createPublicRoom(name, topic) {
+  const normName = name.trim().startsWith("#") ? name.trim() : `#${name.trim()}`;
+  const roomObj = {
+    id: "pub_" + Math.random().toString(36).substring(2, 9),
+    name: normName,
+    topic: topic.trim() || "Community public space",
+    membersCount: 1
+  };
+  publicRooms.push(roomObj);
+  localStorage.setItem("connect_public_rooms", JSON.stringify(publicRooms));
+  return roomObj;
+}
 
 // Unique Username Registry (LocalStorage & Firestore)
 let registeredUsernames = JSON.parse(localStorage.getItem("connect_registered_usernames") || '{"@sarvan": "uid_owner", "@alex": "uid_alex", "@dev_master": "uid_dev"}');
@@ -179,48 +194,6 @@ export function getPassword() {
   return currentPassword;
 }
 
-export function getSoundEnabled() {
-  return isSoundEnabled;
-}
-
-export function getVaultEnabled() {
-  return isVaultEnabled && !peerVaultDisabled;
-}
-
-export function isSelfVaultDisabled() {
-  return !isVaultEnabled;
-}
-
-export function setPeerVaultDisabled(disabled) {
-  peerVaultDisabled = disabled;
-}
-
-export function getSavedVaultMessages() {
-  return savedVaultMessages;
-}
-
-export function saveMessageToVault(msg) {
-  if (!getVaultEnabled()) {
-    throw new Error("Vault Memory is turned off for this room session.");
-  }
-  if (!savedVaultMessages.some((m) => m.id === msg.id)) {
-    const fullDate = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-    const vaultItem = {
-      ...msg,
-      vaultSavedAt: fullDate
-    };
-    savedVaultMessages.unshift(vaultItem);
-    localStorage.setItem("connect_saved_vault", JSON.stringify(savedVaultMessages));
-  }
-}
-
-export function removeSavedMessageFromVault(msgId) {
-  savedVaultMessages = savedVaultMessages.filter((m) => m.id !== msgId);
-  localStorage.setItem("connect_saved_vault", JSON.stringify(savedVaultMessages));
-  return savedVaultMessages;
-}
-
-// Friends System
 export function getFriends() {
   return friendsList;
 }
@@ -252,6 +225,32 @@ export function removeFriend(friendHandle) {
   friendsList = friendsList.filter((f) => f.toLowerCase() !== friendHandle.toLowerCase());
   localStorage.setItem("connect_friends_list", JSON.stringify(friendsList));
   return friendsList;
+}
+
+// Room Invites Notification System
+export function initGlobalEvents(onNotification) {
+  if (globalEventsChannel) globalEventsChannel.close();
+  globalEventsChannel = new BroadcastChannel("connect_global_events");
+
+  globalEventsChannel.onmessage = (e) => {
+    const { type, recipient, sender, roomCode, roomName, isPublic } = e.data || {};
+    if (type === "ROOM_INVITATION" && recipient.toLowerCase() === getUsername().toLowerCase()) {
+      onNotification({ sender, roomCode, roomName, isPublic });
+    }
+  };
+}
+
+export function sendRoomInvitation(friendHandle, roomCode, roomName = null, isPublic = false) {
+  if (globalEventsChannel) {
+    globalEventsChannel.postMessage({
+      type: "ROOM_INVITATION",
+      recipient: friendHandle,
+      sender: getUsername(),
+      roomCode,
+      roomName: roomName || roomCode,
+      isPublic
+    });
+  }
 }
 
 export function formatFileSize(bytes) {
@@ -376,33 +375,6 @@ export function deleteMessage(roomCode, messageId) {
   }
 }
 
-export function toggleReaction(roomCode, messageId, emoji, uid) {
-  const msg = messageStore.get(messageId);
-  if (!msg) return;
-
-  if (!msg.reactions) msg.reactions = {};
-  if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
-
-  const userIdx = msg.reactions[emoji].indexOf(uid);
-  if (userIdx >= 0) {
-    msg.reactions[emoji].splice(userIdx, 1);
-    if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
-  } else {
-    msg.reactions[emoji].push(uid);
-  }
-
-  messageStore.set(messageId, msg);
-  notifyMessages();
-
-  if (roomChannel) {
-    roomChannel.postMessage({
-      type: "MESSAGE_REACTION",
-      messageId,
-      reactions: msg.reactions
-    });
-  }
-}
-
 export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   messageStore.clear();
   typingUsers.clear();
@@ -431,13 +403,6 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     } else if (type === "DELETE_MESSAGE" && messageId) {
       messageStore.delete(messageId);
       notifyMessages();
-    } else if (type === "MESSAGE_REACTION" && messageId) {
-      const existing = messageStore.get(messageId);
-      if (existing) {
-        existing.reactions = reactions;
-        messageStore.set(messageId, existing);
-        notifyMessages();
-      }
     } else if (type === "TYPING_STATUS" && typingUid !== uid) {
       if (isTyping) {
         typingUsers.set(typingUid, { isTyping: true, textLength: textLength || 1 });
@@ -489,12 +454,6 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
                 localTime: timeStr,
                 timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
               });
-            }
-          } else if (change.type === "modified") {
-            const existing = messageStore.get(id);
-            if (existing) {
-              existing.reactions = data.reactions || {};
-              messageStore.set(id, existing);
             }
           } else if (change.type === "removed") {
             messageStore.delete(id);

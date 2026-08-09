@@ -1,4 +1,4 @@
-import { PUBLIC_ROOMS, getProfileBio, getCustomStatus, getProfileBannerColor } from "./chat";
+import { publicRooms, getProfileBio, getCustomStatus, getProfileBannerColor } from "./chat";
 
 export const views = {
   showcase: document.getElementById("view-showcase"),
@@ -39,6 +39,14 @@ export const buttons = {
   editProfileFromCard: document.getElementById("btn-edit-profile-from-card"),
   closeEditProfile: document.getElementById("btn-close-edit-profile"),
   saveProfileCustomization: document.getElementById("btn-save-profile-customization"),
+  createPublicSidebar: document.getElementById("btn-create-public-channel-sidebar"),
+  openCreatePublicModal: document.getElementById("btn-open-create-public-modal"),
+  closeCreatePublic: document.getElementById("btn-close-create-public"),
+  submitCreatePublic: document.getElementById("btn-submit-create-public"),
+  invitePublicChannel: document.getElementById("btn-invite-public-channel"),
+  inviteFriendsWaiting: document.getElementById("btn-invite-friends-waiting"),
+  inviteFriendsChat: document.getElementById("btn-invite-friends-chat"),
+  closeInviteFriends: document.getElementById("btn-close-invite-friends"),
   gearLanding: document.getElementById("btn-gear-landing"),
   gearChat: document.getElementById("btn-gear-chat"),
   closeFullscreenSettings: document.getElementById("btn-close-fullscreen-settings"),
@@ -62,6 +70,8 @@ export const inputs = {
   authVaultToggle: document.getElementById("auth-vault-toggle"),
   authSoundToggle: document.getElementById("auth-sound-toggle"),
   addFriendHandle: document.getElementById("input-add-friend-handle"),
+  publicRoomName: document.getElementById("input-public-room-name"),
+  publicRoomTopic: document.getElementById("input-public-room-topic"),
   profileBioInput: document.getElementById("profile-bio-input"),
   profileStatusInput: document.getElementById("profile-status-input"),
   settingUsername: document.getElementById("setting-input-username"),
@@ -86,6 +96,9 @@ export const displays = {
   modalFriendsList: document.getElementById("modal-friends-list"),
   friendsListContainer: document.getElementById("friends-list-container"),
   modalPublicRooms: document.getElementById("modal-public-rooms"),
+  modalCreatePublicRoom: document.getElementById("modal-create-public-room"),
+  modalInviteFriends: document.getElementById("modal-invite-friends"),
+  inviteFriendsListContainer: document.getElementById("invite-friends-list-container"),
   publicRoomsExplorerList: document.getElementById("public-rooms-explorer-list"),
   publicChannelsListPreview: document.getElementById("public-channels-list-preview"),
   discordChannelsList: document.getElementById("discord-channels-list"),
@@ -208,11 +221,34 @@ export function renderFriendsList(friends, onRemove, onStartPrivateChat) {
   });
 }
 
+export function renderInviteFriendsList(friends, onInvite) {
+  displays.inviteFriendsListContainer.innerHTML = "";
+  if (friends.length === 0) {
+    displays.inviteFriendsListContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:0.82rem;">No connected friends to invite. Add friends from the main hub!</div>`;
+    return;
+  }
+
+  friends.forEach((handle) => {
+    const card = document.createElement("div");
+    card.className = "friend-card";
+    card.innerHTML = `
+      <div class="friend-info">
+        <span class="friend-name">${handle}</span>
+        <span class="friend-status">Online Friend</span>
+      </div>
+      <button class="btn btn-primary btn-invite-user" style="height:30px; font-size:0.75rem; padding:0 12px;">Send Invite</button>
+    `;
+
+    card.querySelector(".btn-invite-user").onclick = () => onInvite(handle);
+    displays.inviteFriendsListContainer.appendChild(card);
+  });
+}
+
 export function renderPublicRoomsExplorer(onJoinChannel) {
   displays.publicRoomsExplorerList.innerHTML = "";
   displays.publicChannelsListPreview.innerHTML = "";
 
-  PUBLIC_ROOMS.forEach((room) => {
+  publicRooms.forEach((room) => {
     const card = document.createElement("div");
     card.className = "explorer-room-card";
     card.innerHTML = `
@@ -239,7 +275,7 @@ export function renderPublicRoomsExplorer(onJoinChannel) {
 export function renderDiscordChannelsList(activeChannelId, onSelectChannel) {
   displays.discordChannelsList.innerHTML = "";
 
-  PUBLIC_ROOMS.forEach((room) => {
+  publicRooms.forEach((room) => {
     const item = document.createElement("div");
     item.className = `channel-item ${room.id === activeChannelId ? "active" : ""}`;
     item.innerHTML = `

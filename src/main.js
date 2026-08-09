@@ -20,7 +20,10 @@ import {
   getFriends,
   addFriend,
   removeFriend,
-  PUBLIC_ROOMS,
+  publicRooms,
+  createPublicRoom,
+  initGlobalEvents,
+  sendRoomInvitation,
   MAX_FILE_SIZE_BYTES,
   formatFileSize
 } from "./chat";
@@ -41,6 +44,7 @@ import {
   hideOverlayDisconnected, 
   renderMessages,
   renderFriendsList,
+  renderInviteFriendsList,
   renderPublicRoomsExplorer,
   renderDiscordChannelsList,
   renderDiscordMembers,
@@ -55,9 +59,10 @@ let roomUnsubscribe = null;
 let chatUnsubscribe = null;
 let publicChatUnsubscribe = null;
 
-let activePublicChannel = PUBLIC_ROOMS[0];
+let activePublicChannel = publicRooms[0];
 let currentAuthMode = "signup";
 let selectedBannerColor = getProfileBannerColor();
+let inviteTargetMode = "private"; // "private" or "public"
 
 async function init() {
   setupEventListeners();
@@ -77,6 +82,16 @@ async function init() {
   if (hasValidSession()) {
     touchSession();
   }
+
+  // Initialize Global Room Invitation Notifications Listener
+  initGlobalEvents(({ sender, roomCode, roomName, isPublic }) => {
+    if (isPublic) {
+      showToast(`🔔 ${sender} invited you to Public Channel ${roomName}!`, 5000);
+    } else {
+      showToast(`🔔 ${sender} invited you to Private Room [${roomCode}]!`, 6000);
+      inputs.code.value = roomCode;
+    }
+  });
 
   updateFriendsUI();
   updatePublicRoomsUI();
@@ -194,6 +209,51 @@ function handleSaveProfileCustomization() {
   showToast("Profile customization saved!");
 }
 
+function openCreatePublicModal() {
+  inputs.publicRoomName.value = "";
+  inputs.publicRoomTopic.value = "";
+  displays.modalCreatePublicRoom.classList.remove("hidden");
+  setTimeout(() => inputs.publicRoomName.focus(), 100);
+}
+
+function handleCreatePublicRoomSubmit() {
+  const name = inputs.publicRoomName.value.trim();
+  const topic = inputs.publicRoomTopic.value.trim();
+
+  if (!name) {
+    showToast("Please enter a channel name e.g. #coding-lounge");
+    return;
+  }
+
+  const newChannel = createPublicRoom(name, topic);
+  displays.modalCreatePublicRoom.classList.add("hidden");
+  updatePublicRoomsUI();
+
+  showToast(`Created ${newChannel.name}! Joining now...`);
+  openPublicWorkspace(newChannel);
+}
+
+function openInviteFriendsModal(mode = "private") {
+  inviteTargetMode = mode;
+  const friends = getFriends();
+
+  renderInviteFriendsList(friends, (friendHandle) => {
+    if (inviteTargetMode === "public") {
+      sendRoomInvitation(friendHandle, activePublicChannel.id, activePublicChannel.name, true);
+      showToast(`Sent invitation to ${friendHandle} for ${activePublicChannel.name}!`);
+    } else {
+      if (!currentRoomCode) {
+        showToast("No active private room code.");
+        return;
+      }
+      sendRoomInvitation(friendHandle, currentRoomCode, null, false);
+      showToast(`Sent private room invite [${currentRoomCode}] to ${friendHandle}!`);
+    }
+  });
+
+  displays.modalInviteFriends.classList.remove("hidden");
+}
+
 function updateFriendsUI() {
   const friends = getFriends();
   renderFriendsList(
@@ -218,7 +278,7 @@ function updatePublicRoomsUI() {
   });
 }
 
-function openPublicWorkspace(channel = PUBLIC_ROOMS[0]) {
+function openPublicWorkspace(channel = publicRooms[0]) {
   activePublicChannel = channel;
   displays.discordChannelName.textContent = channel.name.replace('#', '');
   displays.discordChannelTopic.textContent = channel.topic;
@@ -311,6 +371,18 @@ function setupEventListeners() {
     });
   });
 
+  // Create Public Channel Handlers
+  buttons.createPublicSidebar.addEventListener("click", openCreatePublicModal);
+  buttons.openCreatePublicModal.addEventListener("click", openCreatePublicModal);
+  buttons.closeCreatePublic.addEventListener("click", () => displays.modalCreatePublicRoom.classList.add("hidden"));
+  buttons.submitCreatePublic.addEventListener("click", handleCreatePublicRoomSubmit);
+
+  // Room Invitations Handlers
+  buttons.invitePublicChannel.addEventListener("click", () => openInviteFriendsModal("public"));
+  buttons.inviteFriendsWaiting.addEventListener("click", () => openInviteFriendsModal("private"));
+  buttons.inviteFriendsChat.addEventListener("click", () => openInviteFriendsModal("private"));
+  buttons.closeInviteFriends.addEventListener("click", () => displays.modalInviteFriends.classList.add("hidden"));
+
   // Friends List Drawer Handlers
   buttons.friendsDrawer.addEventListener("click", () => {
     updateFriendsUI();
@@ -364,7 +436,7 @@ function setupEventListeners() {
     displays.discordMembersSidebar.classList.toggle("open");
   });
 
-  // Discord Public Workspace Input Handlers
+  // Public Workspace Input Handlers
   buttons.discordSend.addEventListener("click", handleSendDiscordMessage);
   inputs.discordMessage.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
