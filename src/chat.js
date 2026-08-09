@@ -10,6 +10,8 @@ import {
   onSnapshot, 
   serverTimestamp 
 } from "firebase/firestore";
+import { broadcastPeerData } from "./peerRelay";
+
 
 let roomChannel = null;
 let globalEventsChannel = null;
@@ -292,14 +294,17 @@ export function formatFileSize(bytes) {
 }
 
 export function sendTypingIndicator(roomCode, uid, isTyping, textLength = 0) {
+  const payload = {
+    type: "TYPING_STATUS",
+    uid,
+    isTyping,
+    textLength
+  };
+
   if (roomChannel) {
-    roomChannel.postMessage({
-      type: "TYPING_STATUS",
-      uid,
-      isTyping,
-      textLength
-    });
+    roomChannel.postMessage(payload);
   }
+  broadcastPeerData(payload);
 }
 
 export function listenToTyping(onTypingChange) {
@@ -372,6 +377,12 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
+  broadcastPeerData({
+    type: "CHAT_MESSAGE",
+    roomCode,
+    message: msgObj
+  });
+
   if (isConfigured) {
     withTimeout(addDoc(collection(db, "rooms", roomCode, "messages"), {
       sender: uid,
@@ -403,7 +414,13 @@ export function deleteMessage(roomCode, messageId) {
       messageId
     });
   }
+
+  broadcastPeerData({
+    type: "DELETE_MESSAGE",
+    messageId
+  });
 }
+
 
 export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   messageStore.clear();

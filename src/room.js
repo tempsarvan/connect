@@ -8,6 +8,7 @@ import {
   serverTimestamp,
   arrayUnion
 } from "firebase/firestore";
+import { initPeerRelay, destroyPeerRelay } from "./peerRelay";
 
 export function generateRoomCode() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -186,9 +187,6 @@ function stopPolling(roomCode) {
   }
 }
 
-// Cross-device Firestore polling fallback:
-// When Firebase IS configured but onSnapshot fails (network/cold-start),
-// or as an extra safety net, poll Firestore every 2s to detect joins.
 function startFirestorePolling(roomCode, onUpdate) {
   if (!isConfigured) return;
   stopPolling(roomCode);
@@ -201,7 +199,6 @@ function startFirestorePolling(roomCode, onUpdate) {
         const data = snap.data();
         const current = localRooms.get(roomCode);
 
-        // Detect if members changed or status changed
         const currentMemberCount = current?.members?.length || 0;
         const remoteMemberCount = data.members?.length || 0;
         const statusChanged = current?.status !== data.status;
@@ -211,38 +208,71 @@ function startFirestorePolling(roomCode, onUpdate) {
           localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(data));
           onUpdate(data);
 
-          // If room became active (someone joined), stop polling
           if (data.status === "active" && remoteMemberCount >= 2) {
             stopPolling(roomCode);
           }
         }
       }
-    } catch (err) {
-      // Silently continue polling
-    }
+    } catch (err) {}
   }, 2000);
 
   pollingIntervals.set(roomCode, intervalId);
 }
 
-export function listenToRoom(roomCode, onUpdate) {
+export function listenToRoom(roomCode, onUpdate, currentUid = null) {
   if (!localRoomListeners.has(roomCode)) {
     localRoomListeners.set(roomCode, new Set());
   }
   localRoomListeners.get(roomCode).add(onUpdate);
 
-  if (localRooms.has(roomCode)) {
-    onUpdate(localRooms.get(roomCode));
-  } else {
+  let currentRoomState = localRooms.get(roomCode);
+  if (!currentRoomState) {
     const stored = localStorage.getItem(`connect_room_state_${roomCode}`);
     if (stored) {
       try {
-        const roomData = JSON.parse(stored);
-        localRooms.set(roomCode, roomData);
-        onUpdate(roomData);
+        currentRoomState = JSON.parse(stored);
+        localRooms.set(roomCode, currentRoomState);
       } catch (err) {}
     }
   }
+
+  if (currentRoomState) {
+    onUpdate(currentRoomState);
+  }
+
+  const isCreator = currentRoomState ? currentRoomState.creator === currentUid : false;
+
+  // Initialize PeerJS WebRTC Relay for zero-config cross-device sync
+  initPeerRelay(roomCode, currentUid || "user_" + Math.random().toString(36).substring(2, 8), isCreator, {
+    onRoomUpdate: (event) => {
+      if (event.type === "PEER_JOIN") {
+        let room = localRooms.get(roomCode) || {
+          code: roomCode,
+          creator: currentUid,
+          members: [currentUid],
+          status: "waiting",
+          createdAt: Date.now()
+        };
+
+        if (!room.members.includes(event.joinerUid)) {
+          room.members.push(event.joinerUid);
+        }
+        room.status = "active";
+
+        localRooms.set(roomCode, room);
+        localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
+        notifyRoomListeners(roomCode, room);
+
+        globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
+      } else if (event.type === "ROOM_STATE") {
+        if (event.room) {
+          localRooms.set(roomCode, event.room);
+          localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(event.room));
+          notifyRoomListeners(roomCode, event.room);
+        }
+      }
+    }
+  });
 
   let unsubFirestore = null;
   if (isConfigured) {
@@ -255,7 +285,6 @@ export function listenToRoom(roomCode, onUpdate) {
           localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(data));
           onUpdate(data);
 
-          // Stop polling once onSnapshot is delivering updates
           if (data.status === "active" && data.members?.length >= 2) {
             stopPolling(roomCode);
           }
@@ -263,12 +292,12 @@ export function listenToRoom(roomCode, onUpdate) {
       });
     } catch (err) {}
 
-    // Start polling as a safety net alongside onSnapshot
     startFirestorePolling(roomCode, onUpdate);
   }
 
   return () => {
     stopPolling(roomCode);
+    destroyPeerRelay();
     if (unsubFirestore) unsubFirestore();
     const listeners = localRoomListeners.get(roomCode);
     if (listeners) {
@@ -277,4 +306,5 @@ export function listenToRoom(roomCode, onUpdate) {
     }
   };
 }
+
 
