@@ -10,7 +10,7 @@ import {
 
 let roomChannel = null;
 const messageStore = new Map();
-const typingUsers = new Set();
+const typingUsers = new Map(); // uid -> { isTyping, textLength }
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
 
@@ -100,12 +100,13 @@ export function removeSavedMessageFromVault(msgId) {
   return savedVaultMessages;
 }
 
-export function sendTypingIndicator(roomCode, uid, isTyping) {
+export function sendTypingIndicator(roomCode, uid, isTyping, textLength = 0) {
   if (roomChannel) {
     roomChannel.postMessage({
       type: "TYPING_STATUS",
       uid,
-      isTyping
+      isTyping,
+      textLength
     });
   }
 }
@@ -116,7 +117,7 @@ export function listenToTyping(onTypingChange) {
 }
 
 function notifyTyping() {
-  const users = Array.from(typingUsers);
+  const users = Array.from(typingUsers.entries()).map(([uid, info]) => ({ uid, ...info }));
   typingListeners.forEach((fn) => fn(users));
 }
 
@@ -140,6 +141,9 @@ export async function sendMessage(roomCode, uid, payload) {
   const senderName = getUsername();
 
   if (!text.trim() && !mediaUrl && !soundFx) return;
+
+  // Clear local typing status once message is sent
+  sendTypingIndicator(roomCode, uid, false, 0);
 
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgId = "msg_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
@@ -253,7 +257,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   });
 
   roomChannel.onmessage = (event) => {
-    const { type, message, messageId, reactions, uid: typingUid, isTyping, vaultDisabled } = event.data || {};
+    const { type, message, messageId, reactions, uid: typingUid, isTyping, textLength, vaultDisabled } = event.data || {};
     
     if (type === "ROOM_SETTINGS_UPDATE") {
       setPeerVaultDisabled(!!vaultDisabled);
@@ -274,7 +278,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
       }
     } else if (type === "TYPING_STATUS" && typingUid !== uid) {
       if (isTyping) {
-        typingUsers.add(typingUid);
+        typingUsers.set(typingUid, { isTyping: true, textLength: textLength || 1 });
       } else {
         typingUsers.delete(typingUid);
       }

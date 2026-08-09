@@ -73,7 +73,6 @@ let selectedContextMenuMessage = null;
 let voiceRecorder = null;
 let voiceTimerInterval = null;
 let voiceStartTime = 0;
-let typingTimeout = null;
 
 async function init() {
   setupEventListeners();
@@ -284,7 +283,7 @@ function setupEventListeners() {
     }
   });
 
-  // Chat Input & Typing
+  // Chat Input & Continuous Unsent Draft Typing Broadcast
   buttons.send.addEventListener("click", handleSendMessage);
   inputs.message.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -421,16 +420,18 @@ function handleSelectEmoji(char) {
   input.value = input.value.substring(0, start) + char + input.value.substring(end);
   input.selectionStart = input.selectionEnd = start + char.length;
   input.focus();
+  handleTypingEvent();
 }
 
 function handleTypingEvent() {
   if (!currentRoomCode || !currentUid) return;
-  sendTypingIndicator(currentRoomCode, currentUid, true);
-  
-  if (typingTimeout) clearTimeout(typingTimeout);
-  typingTimeout = setTimeout(() => {
-    sendTypingIndicator(currentRoomCode, currentUid, false);
-  }, 1500);
+  const textLen = inputs.message.value.trim().length;
+
+  if (textLen > 0) {
+    sendTypingIndicator(currentRoomCode, currentUid, true, textLen);
+  } else {
+    sendTypingIndicator(currentRoomCode, currentUid, false, 0);
+  }
 }
 
 function handleMessageClick(msg) {
