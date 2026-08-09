@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Connect — Ephemeral private messaging. No traces.">
+  <title>Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/reset.css">
+  <link rel="stylesheet" href="/styles/tokens.css">
+  <link rel="stylesheet" href="/styles/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>·</text></svg>">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Landing View -->
+    <section id="view-landing" class="view active">
+      <div class="landing-content">
+        <header class="landing-header">
+          <h1 class="logo">connect</h1>
+          <p class="tagline">private. ephemeral. gone.</p>
+        </header>
+        <div class="landing-actions">
+          <button id="btn-create" class="btn btn-primary">create room</button>
+          <div class="divider"><span>or</span></div>
+          <div class="join-group">
+            <input
+              id="input-code"
+              type="text"
+              class="input-code"
+              placeholder="enter code"
+              maxlength="6"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button id="btn-join" class="btn btn-secondary">join</button>
+          </div>
+        </div>
+        <p class="landing-note">messages exist only while you're both here.<br>close the tab, and it's all gone.</p>
+      </div>
+    </section>
+
+    <!-- Waiting View -->
+    <section id="view-waiting" class="view">
+      <div class="waiting-content">
+        <p class="waiting-label">your room code</p>
+        <div class="code-display" id="room-code-display">------</div>
+        <p class="waiting-sublabel">share this with one person</p>
+        <button id="btn-copy-code" class="btn btn-ghost">copy code</button>
+        <div class="pulse-indicator">
+          <span class="pulse-dot"></span>
+          <span class="pulse-text">waiting for connection</span>
+        </div>
+        <button id="btn-cancel-room" class="btn btn-text">cancel</button>
+      </div>
+    </section>
+
+    <!-- Chat View -->
+    <section id="view-chat" class="view">
+      <header class="chat-header">
+        <div class="chat-header-left">
+          <span class="chat-status-dot"></span>
+          <span class="chat-status-text">connected</span>
+        </div>
+        <div class="chat-header-right">
+          <span id="chat-room-code" class="chat-room-code"></span>
+          <button id="btn-end-session" class="btn btn-danger-text">end</button>
+        </div>
+      </header>
+      <div id="messages-container" class="messages-container">
+        <div id="messages-list" class="messages-list"></div>
+      </div>
+      <footer class="chat-input-bar">
+        <input
+          id="input-message"
+          type="text"
+          class="input-message"
+          placeholder="type a message"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button id="btn-send" class="btn btn-send" aria-label="Send message">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </footer>
+    </section>
+
+    <!-- Disconnected Overlay -->
+    <div id="overlay-disconnected" class="overlay hidden">
+      <div class="overlay-content">
+        <p class="overlay-title">session ended</p>
+        <p class="overlay-subtitle">all messages have been destroyed</p>
+        <button id="btn-return-home" class="btn btn-primary">return</button>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
