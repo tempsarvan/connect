@@ -119,6 +119,28 @@
   z-index: 100;
 }
 
+.showcase-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.showcase-logo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 12px #3b82f6;
+}
+
+.showcase-logo-text {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
 .showcase-nav-links {
   display: flex;
   align-items: center;
@@ -171,7 +193,7 @@
   justify-content: center;
   text-align: center;
   padding: var(--space-xl) var(--space-md);
-  max-width: 920px;
+  max-width: 960px;
   margin: 0 auto;
   gap: var(--space-md);
 }
@@ -197,7 +219,11 @@
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: -0.03em;
-  background: linear-gradient(180deg, #ffffff 0%, #a1a1aa 100%);
+  color: #ffffff;
+}
+
+.hero-gradient-text {
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #ec4899 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -225,6 +251,49 @@
   font-weight: 600;
   border-radius: var(--radius-md);
   white-space: nowrap;
+}
+
+/* HERO METRICS BAR */
+.hero-metrics-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xl);
+  margin-top: var(--space-xl);
+  padding: var(--space-md) var(--space-xl);
+  background: rgba(18, 18, 24, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.6);
+  flex-wrap: wrap;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.metric-val {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.metric-lbl {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metric-divider {
+  width: 1px;
+  height: 30px;
+  background: var(--border);
 }
 
 /* Sections */
@@ -1723,5 +1792,12 @@
 @media (max-width: 768px) {
   .tour-cards-grid {
     grid-template-columns: 1fr;
+  }
+  .hero-metrics-bar {
+    gap: var(--space-md);
+    padding: var(--space-md);
+  }
+  .metric-divider {
+    display: none;
   }
 }
