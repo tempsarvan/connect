@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { db, isConfigured, withTimeout } from "./firebase";
 import { 
   collection, 
   addDoc, 
@@ -25,6 +25,9 @@ export async function sendMessage(roomCode, uid, text) {
     timestamp: Date.now()
   };
 
+  // Add to local store instantly
+  messageStore.set(msgObj.id, msgObj);
+
   // Broadcast to other tabs instantly
   if (roomChannel) {
     roomChannel.postMessage({
@@ -34,20 +37,14 @@ export async function sendMessage(roomCode, uid, text) {
     });
   }
 
-  // Also add to local store
-  messageStore.set(msgObj.id, msgObj);
-
-  // Try Firestore in background
-  try {
-    const messagesRef = collection(db, "rooms", roomCode, "messages");
-    await addDoc(messagesRef, {
+  // Try Firestore in background if configured
+  if (isConfigured) {
+    withTimeout(addDoc(collection(db, "rooms", roomCode, "messages"), {
       sender: uid,
       text: cleanText,
       localTime: timeStr,
       timestamp: serverTimestamp()
-    });
-  } catch (err) {
-    // Firestore write bypassed
+    }), 1000).catch(() => {});
   }
 }
 
@@ -77,40 +74,40 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     }
   };
 
-  // Firestore listener
+  // Firestore listener if configured
   let unsubFirestore = null;
-  try {
-    const messagesRef = collection(db, "rooms", roomCode, "messages");
-    const q = query(messagesRef, orderBy("timestamp", "asc"));
-    
-    unsubFirestore = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        const id = change.doc.id;
-        const data = change.doc.data();
+  if (isConfigured) {
+    try {
+      const messagesRef = collection(db, "rooms", roomCode, "messages");
+      const q = query(messagesRef, orderBy("timestamp", "asc"));
+      
+      unsubFirestore = onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          const id = change.doc.id;
+          const data = change.doc.data();
 
-        if (change.type === "added") {
-          let timeStr = data.localTime;
-          if (data.timestamp && data.timestamp.toDate) {
-            timeStr = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          } else if (!timeStr) {
-            timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          if (change.type === "added") {
+            let timeStr = data.localTime;
+            if (data.timestamp && data.timestamp.toDate) {
+              timeStr = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else if (!timeStr) {
+              timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            messageStore.set(id, {
+              id,
+              sender: data.sender,
+              text: data.text,
+              localTime: timeStr,
+              timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
+            });
+          } else if (change.type === "removed") {
+            messageStore.delete(id);
           }
-
-          messageStore.set(id, {
-            id,
-            sender: data.sender,
-            text: data.text,
-            localTime: timeStr,
-            timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
-          });
-        } else if (change.type === "removed") {
-          messageStore.delete(id);
-        }
+        });
+        notify();
       });
-      notify();
-    });
-  } catch (err) {
-    // Firestore listener bypassed
+    } catch (err) {}
   }
 
   // Initial notification

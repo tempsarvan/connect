@@ -88,7 +88,7 @@ async function handleCreateRoom() {
   const roomCode = generateRoomCode();
   
   try {
-    await createRoom(roomCode, currentUid);
+    const roomData = await createRoom(roomCode, currentUid);
     currentRoomCode = roomCode;
     registerUnloadCleanup(currentRoomCode);
 

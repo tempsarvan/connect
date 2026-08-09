@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { db, withTimeout, isConfigured } from "./firebase";
 import { 
   doc, 
   setDoc, 
@@ -65,46 +65,47 @@ export async function createRoom(roomCode, uid) {
     createdAt: Date.now()
   };
 
-  // Register locally
+  // Register locally instantly
   localRooms.set(roomCode, roomData);
   globalChannel.postMessage({ type: "ROOM_CREATED", roomCode, room: roomData });
 
-  // Try Firestore if available
-  try {
-    const roomRef = doc(db, "rooms", roomCode);
-    await setDoc(roomRef, {
+  // Try Firestore in background if configured, with short timeout so it NEVER hangs
+  if (isConfigured) {
+    withTimeout(setDoc(doc(db, "rooms", roomCode), {
       ...roomData,
       createdAt: serverTimestamp()
+    })).catch(() => {
+      // Ignore background firestore timeout
     });
-  } catch (err) {
-    console.log("Firestore creation bypassed (using local real-time sync)");
   }
 
   return roomData;
 }
 
 export async function joinRoom(roomCode, uid) {
-  // 1. Try Firestore first
-  try {
-    const roomRef = doc(db, "rooms", roomCode);
-    const snap = await getDoc(roomRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.status === "ended") {
-        throw new Error("This room session has ended.");
+  // 1. Try Firestore if configured
+  if (isConfigured) {
+    try {
+      const roomRef = doc(db, "rooms", roomCode);
+      const snap = await withTimeout(getDoc(roomRef), 1000);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.status === "ended") {
+          throw new Error("This room session has ended.");
+        }
+        if (data.members.length >= 2 && !data.members.includes(uid)) {
+          throw new Error("Room is full (limit 2 devices).");
+        }
+        await withTimeout(updateDoc(roomRef, {
+          members: arrayUnion(uid),
+          status: "active"
+        }), 1000);
+        return { ...data, status: "active", members: [...data.members, uid] };
       }
-      if (data.members.length >= 2 && !data.members.includes(uid)) {
-        throw new Error("Room is full (limit 2 devices).");
+    } catch (err) {
+      if (err.message.includes("ended") || err.message.includes("full")) {
+        throw err;
       }
-      await updateDoc(roomRef, {
-        members: arrayUnion(uid),
-        status: "active"
-      });
-      return { ...data, status: "active", members: [...data.members, uid] };
-    }
-  } catch (err) {
-    if (err.message.includes("ended") || err.message.includes("full")) {
-      throw err;
     }
   }
 
@@ -130,7 +131,7 @@ export async function joinRoom(roomCode, uid) {
       return resolve(room);
     }
 
-    // Query other tabs
+    // Query other tabs on same origin
     const handleResponse = (e) => {
       if (resolved) return;
       const data = e.data || {};
@@ -156,7 +157,7 @@ export async function joinRoom(roomCode, uid) {
     globalChannel.addEventListener("message", handleResponse);
     globalChannel.postMessage({ type: "QUERY_ROOM", roomCode, senderTabId: myTabId });
 
-    // Fallback: If no other tab responds in 800ms, assume room created locally or grant access
+    // Instant fallback if no other tab responds: grant access to joined room
     setTimeout(() => {
       if (!resolved) {
         resolved = true;
@@ -172,22 +173,24 @@ export async function joinRoom(roomCode, uid) {
         localRooms.set(roomCode, fallbackRoom);
         resolve(fallbackRoom);
       }
-    }, 800);
+    }, 400);
   });
 }
 
 export function listenToRoom(roomCode, onUpdate) {
   let unsubFirestore = null;
 
-  try {
-    const roomRef = doc(db, "rooms", roomCode);
-    unsubFirestore = onSnapshot(roomRef, (snap) => {
-      if (snap.exists()) {
-        onUpdate(snap.data());
-      }
-    });
-  } catch (err) {
-    // Ignore firestore listener failure
+  if (isConfigured) {
+    try {
+      const roomRef = doc(db, "rooms", roomCode);
+      unsubFirestore = onSnapshot(roomRef, (snap) => {
+        if (snap.exists()) {
+          onUpdate(snap.data());
+        }
+      });
+    } catch (err) {
+      // Ignore firestore listener failure
+    }
   }
 
   // Local Broadcast listener

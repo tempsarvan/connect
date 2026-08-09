@@ -2,11 +2,11 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// Firebase Configuration
-// If environment variables or custom config exist, use them.
-// Default fallback provides standard initialization structure.
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY || "";
+export const isConfigured = Boolean(apiKey && apiKey !== "AIzaSyDemoKeyForConnectApp1234567");
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDemoKeyForConnectApp1234567",
+  apiKey: apiKey || "AIzaSyDemoKeyForConnectApp1234567",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "connect-private.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "connect-private",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "connect-private.appspot.com",
@@ -17,5 +17,27 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+// Promise with timeout helper to prevent hanging on Firestore network retries
+export function withTimeout(promise, ms = 1200) {
+  if (!isConfigured) {
+    return Promise.reject(new Error("Firebase not configured with active key"));
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Firestore operation timed out"));
+    }, ms);
+
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
 
 export { app, db, auth };
