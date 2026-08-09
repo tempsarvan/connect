@@ -654,7 +654,7 @@ async function handleJoinRoom() {
   if (!currentUid) currentUid = getUserUid();
 
   try {
-    await joinRoom(code, currentUid);
+    await joinRoom(code, currentUid, getUsername());
     currentRoomCode = code;
 
     // Check if room code exists in saved public rooms

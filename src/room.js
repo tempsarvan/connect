@@ -8,6 +8,12 @@ import {
   serverTimestamp,
   arrayUnion
 } from "firebase/firestore";
+import { 
+  initPeerHost, 
+  connectToHost, 
+  broadcastPeerData, 
+  closePeer 
+} from "./peerRelay";
 
 export function generateRoomCode() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -22,6 +28,7 @@ const globalChannel = new BroadcastChannel("connect_room_registry");
 const localRooms = new Map();
 const localRoomListeners = new Map();
 const ntfyEventSources = new Map();
+const pollingIntervals = new Map();
 
 function notifyRoomListeners(roomCode, roomData) {
   const listeners = localRoomListeners.get(roomCode);
@@ -60,7 +67,7 @@ globalChannel.onmessage = (event) => {
   }
 };
 
-// Zero-Config Global Real-time Pub/Sub Signaling over ntfy.sh
+// Global PubSub Signaling over ntfy.sh
 function publishNtfySignal(roomCode, payload) {
   try {
     fetch(`https://ntfy.sh/connect_room_sig_${roomCode}`, {
@@ -99,6 +106,44 @@ function listenNtfySignal(roomCode, onSignal) {
   }
 }
 
+// HTTP Polling Fallback for ntfy.sh topic
+function startPollingSignal(roomCode, onSignal) {
+  if (pollingIntervals.has(roomCode)) {
+    clearInterval(pollingIntervals.get(roomCode));
+  }
+
+  let lastSeenId = "";
+  const intervalId = setInterval(async () => {
+    try {
+      const res = await fetch(`https://ntfy.sh/connect_room_sig_${roomCode}/json?poll=1`);
+      if (res.ok) {
+        const text = await res.text();
+        const lines = text.trim().split("\n");
+        lines.forEach((line) => {
+          if (!line) return;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed && parsed.id && parsed.id !== lastSeenId && parsed.message) {
+              lastSeenId = parsed.id;
+              const payload = JSON.parse(parsed.message);
+              onSignal(payload);
+            }
+          } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  }, 1500);
+
+  pollingIntervals.set(roomCode, intervalId);
+}
+
+function stopPollingSignal(roomCode) {
+  if (pollingIntervals.has(roomCode)) {
+    clearInterval(pollingIntervals.get(roomCode));
+    pollingIntervals.delete(roomCode);
+  }
+}
+
 export async function createRoom(roomCode, uid) {
   const roomData = {
     code: roomCode,
@@ -111,6 +156,11 @@ export async function createRoom(roomCode, uid) {
   localRooms.set(roomCode, roomData);
   localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(roomData));
   globalChannel.postMessage({ type: "ROOM_CREATED", roomCode, room: roomData });
+
+  // Initialize WebRTC Host for room code
+  initPeerHost(roomCode, (peerSignal, conn) => {
+    handleHostIncomingSignal(roomCode, peerSignal, conn);
+  });
 
   publishNtfySignal(roomCode, { type: "ROOM_CREATED", room: roomData });
 
@@ -126,7 +176,44 @@ export async function createRoom(roomCode, uid) {
   return roomData;
 }
 
-export async function joinRoom(roomCode, uid) {
+function handleHostIncomingSignal(roomCode, signal, conn = null) {
+  if (signal.type === "JOIN_REQUEST") {
+    const current = localRooms.get(roomCode) || { members: [], status: "waiting" };
+    const joinerUid = signal.joinerUid;
+
+    const newMembers = Array.from(new Set([...current.members, joinerUid].filter(Boolean)));
+    const updatedRoom = {
+      ...current,
+      code: roomCode,
+      members: newMembers,
+      status: "active"
+    };
+
+    localRooms.set(roomCode, updatedRoom);
+    localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(updatedRoom));
+    notifyRoomListeners(roomCode, updatedRoom);
+
+    // Send back active status confirmation to joining client
+    const responsePayload = { type: "ROOM_ACTIVE", roomCode, room: updatedRoom };
+    if (conn && conn.open) {
+      conn.send(responsePayload);
+    }
+    broadcastPeerData(responsePayload);
+    publishNtfySignal(roomCode, responsePayload);
+
+    if (isConfigured) {
+      try {
+        const roomRef = doc(db, "rooms", roomCode);
+        updateDoc(roomRef, {
+          members: arrayUnion(joinerUid),
+          status: "active"
+        }).catch(() => {});
+      } catch (err) {}
+    }
+  }
+}
+
+export async function joinRoom(roomCode, uid, username = "@anonymous") {
   let room = localRooms.get(roomCode);
   if (!room) {
     const stored = localStorage.getItem(`connect_room_state_${roomCode}`);
@@ -140,7 +227,7 @@ export async function joinRoom(roomCode, uid) {
       code: roomCode,
       creator: uid,
       members: [uid],
-      status: "active",
+      status: "waiting",
       createdAt: Date.now()
     };
   } else {
@@ -152,11 +239,24 @@ export async function joinRoom(roomCode, uid) {
 
   localRooms.set(roomCode, room);
   localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
-  notifyRoomListeners(roomCode, room);
+
+  // Connect via WebRTC PeerJS to Host
+  connectToHost(roomCode, uid, username, (peerSignal) => {
+    if (peerSignal.type === "ROOM_ACTIVE") {
+      const updated = {
+        ...localRooms.get(roomCode),
+        ...(peerSignal.room || {}),
+        status: "active"
+      };
+      localRooms.set(roomCode, updated);
+      localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(updated));
+      notifyRoomListeners(roomCode, updated);
+    }
+  });
 
   // Broadcast join signal across tabs and internet
   globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
-  publishNtfySignal(roomCode, { type: "JOIN_REQUEST", joinerUid: uid, room });
+  publishNtfySignal(roomCode, { type: "JOIN_REQUEST", joinerUid: uid, roomCode });
 
   if (isConfigured) {
     try {
@@ -190,18 +290,15 @@ export function listenToRoom(roomCode, onUpdate) {
     }
   }
 
-  // Real-Time Cross-Device SSE Listener
-  const cleanupNtfy = listenNtfySignal(roomCode, (signal) => {
-    if (signal.type === "JOIN_REQUEST" || signal.type === "ROOM_UPDATED") {
+  const handleIncomingSignal = (signal) => {
+    if (signal.type === "JOIN_REQUEST") {
+      handleHostIncomingSignal(roomCode, signal);
+    } else if (signal.type === "ROOM_ACTIVE" || signal.type === "ROOM_UPDATED") {
       const current = localRooms.get(roomCode) || { members: [], status: "waiting" };
-      const joinerUid = signal.joinerUid;
-
-      const newMembers = Array.from(new Set([...current.members, ...(signal.room?.members || []), joinerUid].filter(Boolean)));
       const updatedRoom = {
         ...current,
         ...(signal.room || {}),
-        members: newMembers,
-        status: newMembers.length >= 2 ? "active" : (current.status || "waiting")
+        status: "active"
       };
 
       localRooms.set(roomCode, updatedRoom);
@@ -212,7 +309,13 @@ export function listenToRoom(roomCode, onUpdate) {
       localStorage.removeItem(`connect_room_state_${roomCode}`);
       onUpdate({ status: "ended" });
     }
-  });
+  };
+
+  // 1. Real-Time Cross-Device SSE Listener
+  const cleanupNtfy = listenNtfySignal(roomCode, handleIncomingSignal);
+
+  // 2. HTTP Polling Fallback Listener
+  startPollingSignal(roomCode, handleIncomingSignal);
 
   let unsubFirestore = null;
   if (isConfigured) {
@@ -231,6 +334,8 @@ export function listenToRoom(roomCode, onUpdate) {
 
   return () => {
     cleanupNtfy();
+    stopPollingSignal(roomCode);
+    closePeer();
     if (unsubFirestore) unsubFirestore();
     const listeners = localRoomListeners.get(roomCode);
     if (listeners) {
