@@ -30,6 +30,7 @@ export const buttons = {
   declineCall: document.getElementById("btn-decline-call"),
   callToggleMic: document.getElementById("btn-call-toggle-mic"),
   callToggleCam: document.getElementById("btn-call-toggle-cam"),
+  callFlipCam: document.getElementById("btn-call-flip-cam"),
   callEnd: document.getElementById("btn-call-end")
 };
 
@@ -177,7 +178,6 @@ export function initMediaPopovers(onSelectGif, onSelectSticker) {
   });
 }
 
-// Custom Premium Voice Note Player Component
 function createCustomAudioPlayer(audioUrl) {
   const container = document.createElement("div");
   container.className = "custom-audio-player";
@@ -235,7 +235,6 @@ function createCustomAudioPlayer(audioUrl) {
   return container;
 }
 
-// Render Messages Engine
 export function renderMessages(messages, currentUid, onReactionClick, onReplyClick) {
   displays.messagesList.innerHTML = "";
 

@@ -1,15 +1,21 @@
-// WebRTC & MediaStream Peer-to-Peer Calling Module
+// WebRTC & MediaStream Peer-to-Peer Calling Module (Mobile & Desktop Optimized)
 
 let localStream = null;
 let peerConnection = null;
 let callChannel = null;
+let currentFacingMode = "user"; // 'user' (front) or 'environment' (back)
 
 const rtcConfig = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" }
   ]
 };
+
+export function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
 
 export class CallManager {
   constructor() {
@@ -20,25 +26,35 @@ export class CallManager {
     this.onCallStateChange = null;
     this.onRemoteStream = null;
     this.onIncomingCall = null;
+    this.currentRoomCode = null;
+    this.currentUid = null;
   }
 
   init(roomCode, uid) {
+    this.currentRoomCode = roomCode;
+    this.currentUid = uid;
+
     if (callChannel) callChannel.close();
     callChannel = new BroadcastChannel(`connect_call_${roomCode}`);
 
     callChannel.onmessage = async (event) => {
       const { type, senderUid, isVideo, offer, answer, candidate } = event.data || {};
-      if (senderUid === uid) return; // Ignore own messages
+      if (senderUid === uid) return;
 
       if (type === "CALL_OFFER") {
         if (this.onIncomingCall) {
           this.onIncomingCall({ senderUid, isVideo, offer });
         }
       } else if (type === "CALL_ANSWER") {
-        if (peerConnection && offer) {
+        if (peerConnection && answer) {
           try {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-          } catch (e) {}
+            if (this.onCallStateChange) {
+              this.onCallStateChange({ status: "connected", localStream });
+            }
+          } catch (e) {
+            console.warn("Set remote answer error:", e);
+          }
         }
       } else if (type === "ICE_CANDIDATE") {
         if (peerConnection && candidate) {
@@ -47,23 +63,44 @@ export class CallManager {
           } catch (e) {}
         }
       } else if (type === "CALL_DECLINED") {
-        this.stopCall("Call declined");
+        this.stopCall("Call declined by peer");
       } else if (type === "CALL_ENDED") {
         this.stopCall("Call ended");
       }
     };
   }
 
+  async getMediaStream(isVideo = true, facing = "user") {
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true
+    };
+
+    const videoConstraints = isVideo ? {
+      facingMode: facing,
+      width: { ideal: isMobileDevice() ? 640 : 1280 },
+      height: { ideal: isMobileDevice() ? 480 : 720 },
+      frameRate: { max: 30 }
+    } : false;
+
+    // Mobile immediate stream request
+    return await navigator.mediaDevices.getUserMedia({
+      audio: audioConstraints,
+      video: videoConstraints
+    });
+  }
+
   async startCall(roomCode, uid, isVideo = true) {
     this.isVideo = isVideo;
     this.activeCall = true;
 
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: isVideo ? { width: 1280, height: 720 } : false
-      });
+    if (this.onCallStateChange) {
+      this.onCallStateChange({ status: "requesting_permissions" });
+    }
 
+    try {
+      localStream = await this.getMediaStream(isVideo, currentFacingMode);
       this.createPeerConnection(roomCode, uid);
 
       localStream.getTracks().forEach((track) => {
@@ -88,7 +125,7 @@ export class CallManager {
 
       return localStream;
     } catch (err) {
-      this.stopCall(err.message || "Could not access camera/microphone");
+      this.stopCall(err.message || "Camera/microphone permission denied");
       throw err;
     }
   }
@@ -97,12 +134,12 @@ export class CallManager {
     this.isVideo = isVideo;
     this.activeCall = true;
 
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: isVideo ? { width: 1280, height: 720 } : false
-      });
+    if (this.onCallStateChange) {
+      this.onCallStateChange({ status: "requesting_permissions" });
+    }
 
+    try {
+      localStream = await this.getMediaStream(isVideo, currentFacingMode);
       this.createPeerConnection(roomCode, uid);
 
       localStream.getTracks().forEach((track) => {
@@ -129,7 +166,7 @@ export class CallManager {
 
       return localStream;
     } catch (err) {
-      this.stopCall("Failed to connect call: " + err.message);
+      this.stopCall("Call failed: " + err.message);
       throw err;
     }
   }
@@ -186,6 +223,37 @@ export class CallManager {
       }
     }
     return false;
+  }
+
+  async flipCamera() {
+    if (!this.isVideo || !localStream) return;
+    currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+    
+    try {
+      const newStream = await this.getMediaStream(true, currentFacingMode);
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      
+      const oldVideoTrack = localStream.getVideoTracks()[0];
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+        localStream.removeTrack(oldVideoTrack);
+      }
+      
+      localStream.addTrack(newVideoTrack);
+      
+      if (peerConnection) {
+        const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(newVideoTrack);
+        }
+      }
+
+      if (this.onCallStateChange) {
+        this.onCallStateChange({ status: "connected", localStream });
+      }
+    } catch (e) {
+      console.warn("Camera flip error:", e);
+    }
   }
 
   stopCall(reason = null) {

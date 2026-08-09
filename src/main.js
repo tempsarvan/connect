@@ -28,7 +28,7 @@ import {
   clearNotifications, 
   listenToNotifications 
 } from "./notifications";
-import { callManager } from "./call";
+import { callManager, isMobileDevice } from "./call";
 import { 
   views, 
   buttons, 
@@ -164,6 +164,11 @@ function setupEventListeners() {
     showToast(isOff ? "Camera Off" : "Camera On");
   });
 
+  buttons.callFlipCam.addEventListener("click", () => {
+    callManager.flipCamera();
+    showToast("Flipping Camera...");
+  });
+
   buttons.callEnd.addEventListener("click", () => {
     callManager.stopCall("Call ended");
   });
@@ -253,7 +258,6 @@ function startChatSession() {
 
   addNotification("Room Active", `Connected to room ${currentRoomCode}`, "🔒");
 
-  // Setup Calling Manager for room
   callManager.init(currentRoomCode, currentUid);
 
   callManager.onIncomingCall = ({ senderUid, isVideo, offer }) => {
@@ -268,17 +272,24 @@ function startChatSession() {
   };
 
   callManager.onCallStateChange = ({ status, localStream, reason }) => {
-    if (status === "calling" || status === "connected") {
+    if (status === "requesting_permissions") {
+      showToast("Requesting camera/microphone permissions...");
+    } else if (status === "calling" || status === "connected") {
       displays.callOverlay.classList.remove("hidden");
+      
       if (localStream) {
         displays.localVideo.srcObject = localStream;
+        displays.localVideo.play().catch(() => {});
       }
+      
       if (!callManager.isVideo) {
         displays.localVideo.classList.add("hidden");
         displays.audioCallAvatar.classList.remove("hidden");
+        displays.remoteVideo.classList.add("hidden");
       } else {
         displays.localVideo.classList.remove("hidden");
         displays.audioCallAvatar.classList.add("hidden");
+        displays.remoteVideo.classList.remove("hidden");
       }
     } else if (status === "ended") {
       displays.callOverlay.classList.add("hidden");
@@ -291,13 +302,12 @@ function startChatSession() {
 
   callManager.onRemoteStream = (remoteStream) => {
     displays.remoteVideo.srcObject = remoteStream;
+    displays.remoteVideo.play().catch(() => {});
   };
 
-  // Listen to chat messages
   let previousMsgCount = 0;
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
-    // Play chime & log notification on new peer message
     if (messages.length > previousMsgCount && previousMsgCount > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.sender !== currentUid) {
@@ -316,7 +326,6 @@ function startChatSession() {
     renderMessages(messages, currentUid, handleReactionClick, handleReplyClick);
   });
 
-  // Listen to typing status
   if (typingUnsubscribe) typingUnsubscribe();
   typingUnsubscribe = listenToTyping((users) => {
     if (users.length > 0) {
@@ -326,7 +335,6 @@ function startChatSession() {
     }
   });
 
-  // Listen to room status changes
   if (roomUnsubscribe) roomUnsubscribe();
   roomUnsubscribe = listenToRoom(currentRoomCode, (roomData) => {
     if (!roomData || roomData.status === "ended") {
