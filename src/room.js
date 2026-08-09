@@ -8,7 +8,6 @@ import {
   serverTimestamp,
   arrayUnion
 } from "firebase/firestore";
-import { initPeerRelay, destroyPeerRelay } from "./peerRelay";
 
 export function generateRoomCode() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -22,7 +21,7 @@ export function generateRoomCode() {
 const globalChannel = new BroadcastChannel("connect_room_registry");
 const localRooms = new Map();
 const localRoomListeners = new Map();
-const pollingIntervals = new Map();
+const ntfyEventSources = new Map();
 
 function notifyRoomListeners(roomCode, roomData) {
   const listeners = localRoomListeners.get(roomCode);
@@ -31,7 +30,7 @@ function notifyRoomListeners(roomCode, roomData) {
   }
 }
 
-// Window Storage Event & BroadcastChannel for cross-tab & cross-device local sync
+// Window Storage Event & BroadcastChannel for same-device cross-tab sync
 window.addEventListener("storage", (e) => {
   if (e.key && e.key.startsWith("connect_room_state_")) {
     const roomCode = e.key.replace("connect_room_state_", "");
@@ -48,34 +47,7 @@ window.addEventListener("storage", (e) => {
 globalChannel.onmessage = (event) => {
   const { type, roomCode, joinerUid, room } = event.data || {};
   
-  if (type === "QUERY_ROOM") {
-    if (localRooms.has(roomCode)) {
-      const room = localRooms.get(roomCode);
-      globalChannel.postMessage({
-        type: "ROOM_FOUND",
-        roomCode,
-        room
-      });
-    }
-  } else if (type === "JOIN_REQUEST") {
-    if (localRooms.has(roomCode)) {
-      const room = localRooms.get(roomCode);
-      if (!room.members.includes(joinerUid)) {
-        room.members.push(joinerUid);
-        room.status = "active";
-        localRooms.set(roomCode, room);
-
-        localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
-        notifyRoomListeners(roomCode, room);
-
-        globalChannel.postMessage({
-          type: "ROOM_UPDATED",
-          roomCode,
-          room
-        });
-      }
-    }
-  } else if (type === "ROOM_UPDATED" || type === "ROOM_CREATED") {
+  if (type === "ROOM_UPDATED" || type === "ROOM_CREATED") {
     if (room) {
       localRooms.set(roomCode, room);
       localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
@@ -87,6 +59,45 @@ globalChannel.onmessage = (event) => {
     notifyRoomListeners(roomCode, { status: "ended" });
   }
 };
+
+// Zero-Config Global Real-time Pub/Sub Signaling over ntfy.sh
+function publishNtfySignal(roomCode, payload) {
+  try {
+    fetch(`https://ntfy.sh/connect_room_sig_${roomCode}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+function listenNtfySignal(roomCode, onSignal) {
+  if (ntfyEventSources.has(roomCode)) {
+    ntfyEventSources.get(roomCode).close();
+  }
+
+  try {
+    const sse = new EventSource(`https://ntfy.sh/connect_room_sig_${roomCode}/json`);
+    ntfyEventSources.set(roomCode, sse);
+
+    sse.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed && parsed.message) {
+          const payload = JSON.parse(parsed.message);
+          onSignal(payload);
+        }
+      } catch (e) {}
+    };
+
+    return () => {
+      sse.close();
+      ntfyEventSources.delete(roomCode);
+    };
+  } catch (e) {
+    return () => {};
+  }
+}
 
 export async function createRoom(roomCode, uid) {
   const roomData = {
@@ -101,6 +112,8 @@ export async function createRoom(roomCode, uid) {
   localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(roomData));
   globalChannel.postMessage({ type: "ROOM_CREATED", roomCode, room: roomData });
 
+  publishNtfySignal(roomCode, { type: "ROOM_CREATED", room: roomData });
+
   if (isConfigured) {
     try {
       await withTimeout(setDoc(doc(db, "rooms", roomCode), {
@@ -114,39 +127,6 @@ export async function createRoom(roomCode, uid) {
 }
 
 export async function joinRoom(roomCode, uid) {
-  // 1. Try Firestore if configured
-  if (isConfigured) {
-    try {
-      const roomRef = doc(db, "rooms", roomCode);
-      const snap = await withTimeout(getDoc(roomRef), 1200);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.status === "ended") {
-          throw new Error("This room session has ended.");
-        }
-        
-        const updatedMembers = Array.from(new Set([...(data.members || []), uid]));
-        const updatedRoom = { ...data, status: "active", members: updatedMembers };
-
-        await withTimeout(updateDoc(roomRef, {
-          members: arrayUnion(uid),
-          status: "active"
-        }), 1200);
-
-        localRooms.set(roomCode, updatedRoom);
-        localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(updatedRoom));
-        notifyRoomListeners(roomCode, updatedRoom);
-
-        return updatedRoom;
-      }
-    } catch (err) {
-      if (err.message.includes("ended") || err.message.includes("full")) {
-        throw err;
-      }
-    }
-  }
-
-  // 2. Local & Storage fallback
   let room = localRooms.get(roomCode);
   if (!room) {
     const stored = localStorage.getItem(`connect_room_state_${roomCode}`);
@@ -174,103 +154,63 @@ export async function joinRoom(roomCode, uid) {
   localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
   notifyRoomListeners(roomCode, room);
 
+  // Broadcast join signal across tabs and internet
   globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
+  publishNtfySignal(roomCode, { type: "JOIN_REQUEST", joinerUid: uid, room });
+
+  if (isConfigured) {
+    try {
+      const roomRef = doc(db, "rooms", roomCode);
+      await withTimeout(updateDoc(roomRef, {
+        members: arrayUnion(uid),
+        status: "active"
+      }), 1200);
+    } catch (err) {}
+  }
 
   return room;
 }
 
-function stopPolling(roomCode) {
-  const id = pollingIntervals.get(roomCode);
-  if (id) {
-    clearInterval(id);
-    pollingIntervals.delete(roomCode);
-  }
-}
-
-function startFirestorePolling(roomCode, onUpdate) {
-  if (!isConfigured) return;
-  stopPolling(roomCode);
-
-  const intervalId = setInterval(async () => {
-    try {
-      const roomRef = doc(db, "rooms", roomCode);
-      const snap = await withTimeout(getDoc(roomRef), 2000);
-      if (snap.exists()) {
-        const data = snap.data();
-        const current = localRooms.get(roomCode);
-
-        const currentMemberCount = current?.members?.length || 0;
-        const remoteMemberCount = data.members?.length || 0;
-        const statusChanged = current?.status !== data.status;
-
-        if (remoteMemberCount > currentMemberCount || statusChanged) {
-          localRooms.set(roomCode, data);
-          localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(data));
-          onUpdate(data);
-
-          if (data.status === "active" && remoteMemberCount >= 2) {
-            stopPolling(roomCode);
-          }
-        }
-      }
-    } catch (err) {}
-  }, 2000);
-
-  pollingIntervals.set(roomCode, intervalId);
-}
-
-export function listenToRoom(roomCode, onUpdate, currentUid = null) {
+export function listenToRoom(roomCode, onUpdate) {
   if (!localRoomListeners.has(roomCode)) {
     localRoomListeners.set(roomCode, new Set());
   }
   localRoomListeners.get(roomCode).add(onUpdate);
 
-  let currentRoomState = localRooms.get(roomCode);
-  if (!currentRoomState) {
+  if (localRooms.has(roomCode)) {
+    onUpdate(localRooms.get(roomCode));
+  } else {
     const stored = localStorage.getItem(`connect_room_state_${roomCode}`);
     if (stored) {
       try {
-        currentRoomState = JSON.parse(stored);
-        localRooms.set(roomCode, currentRoomState);
+        const roomData = JSON.parse(stored);
+        localRooms.set(roomCode, roomData);
+        onUpdate(roomData);
       } catch (err) {}
     }
   }
 
-  if (currentRoomState) {
-    onUpdate(currentRoomState);
-  }
+  // Real-Time Cross-Device SSE Listener
+  const cleanupNtfy = listenNtfySignal(roomCode, (signal) => {
+    if (signal.type === "JOIN_REQUEST" || signal.type === "ROOM_UPDATED") {
+      const current = localRooms.get(roomCode) || { members: [], status: "waiting" };
+      const joinerUid = signal.joinerUid;
 
-  const isCreator = currentRoomState ? currentRoomState.creator === currentUid : false;
+      const newMembers = Array.from(new Set([...current.members, ...(signal.room?.members || []), joinerUid].filter(Boolean)));
+      const updatedRoom = {
+        ...current,
+        ...(signal.room || {}),
+        members: newMembers,
+        status: newMembers.length >= 2 ? "active" : (current.status || "waiting")
+      };
 
-  // Initialize PeerJS WebRTC Relay for zero-config cross-device sync
-  initPeerRelay(roomCode, currentUid || "user_" + Math.random().toString(36).substring(2, 8), isCreator, {
-    onRoomUpdate: (event) => {
-      if (event.type === "PEER_JOIN") {
-        let room = localRooms.get(roomCode) || {
-          code: roomCode,
-          creator: currentUid,
-          members: [currentUid],
-          status: "waiting",
-          createdAt: Date.now()
-        };
-
-        if (!room.members.includes(event.joinerUid)) {
-          room.members.push(event.joinerUid);
-        }
-        room.status = "active";
-
-        localRooms.set(roomCode, room);
-        localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
-        notifyRoomListeners(roomCode, room);
-
-        globalChannel.postMessage({ type: "ROOM_UPDATED", roomCode, room });
-      } else if (event.type === "ROOM_STATE") {
-        if (event.room) {
-          localRooms.set(roomCode, event.room);
-          localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(event.room));
-          notifyRoomListeners(roomCode, event.room);
-        }
-      }
+      localRooms.set(roomCode, updatedRoom);
+      localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(updatedRoom));
+      onUpdate(updatedRoom);
+    } else if (signal.type === "DESTROY_ROOM" || signal.type === "SESSION_ENDED") {
+      localRooms.delete(roomCode);
+      localStorage.removeItem(`connect_room_state_${roomCode}`);
+      onUpdate({ status: "ended" });
     }
   });
 
@@ -284,20 +224,13 @@ export function listenToRoom(roomCode, onUpdate, currentUid = null) {
           localRooms.set(roomCode, data);
           localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(data));
           onUpdate(data);
-
-          if (data.status === "active" && data.members?.length >= 2) {
-            stopPolling(roomCode);
-          }
         }
       });
     } catch (err) {}
-
-    startFirestorePolling(roomCode, onUpdate);
   }
 
   return () => {
-    stopPolling(roomCode);
-    destroyPeerRelay();
+    cleanupNtfy();
     if (unsubFirestore) unsubFirestore();
     const listeners = localRoomListeners.get(roomCode);
     if (listeners) {
@@ -306,5 +239,3 @@ export function listenToRoom(roomCode, onUpdate, currentUid = null) {
     }
   };
 }
-
-

@@ -10,11 +10,10 @@ import {
   onSnapshot, 
   serverTimestamp 
 } from "firebase/firestore";
-import { broadcastPeerData } from "./peerRelay";
-
 
 let roomChannel = null;
 let globalEventsChannel = null;
+let ntfyChatEventSource = null;
 const messageStore = new Map();
 const typingUsers = new Map();
 let typingListeners = new Set();
@@ -294,17 +293,14 @@ export function formatFileSize(bytes) {
 }
 
 export function sendTypingIndicator(roomCode, uid, isTyping, textLength = 0) {
-  const payload = {
-    type: "TYPING_STATUS",
-    uid,
-    isTyping,
-    textLength
-  };
-
   if (roomChannel) {
-    roomChannel.postMessage(payload);
+    roomChannel.postMessage({
+      type: "TYPING_STATUS",
+      uid,
+      isTyping,
+      textLength
+    });
   }
-  broadcastPeerData(payload);
 }
 
 export function listenToTyping(onTypingChange) {
@@ -322,6 +318,17 @@ function notifyMessages() {
     const sorted = Array.from(messageStore.values()).sort((a, b) => a.timestamp - b.timestamp);
     onMessagesUpdatedCallback(sorted);
   }
+}
+
+// Zero-Config Global Real-time Pub/Sub Chat Sync over ntfy.sh
+function publishNtfyMessage(roomCode, payload) {
+  try {
+    fetch(`https://ntfy.sh/connect_chat_msg_${roomCode}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  } catch (e) {}
 }
 
 export async function sendMessage(roomCode, uid, payload) {
@@ -377,7 +384,8 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
-  broadcastPeerData({
+  // Cross-device ntfy.sh message broadcast
+  publishNtfyMessage(roomCode, {
     type: "CHAT_MESSAGE",
     roomCode,
     message: msgObj
@@ -415,12 +423,11 @@ export function deleteMessage(roomCode, messageId) {
     });
   }
 
-  broadcastPeerData({
+  publishNtfyMessage(roomCode, {
     type: "DELETE_MESSAGE",
     messageId
   });
 }
-
 
 export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   messageStore.clear();
@@ -432,8 +439,8 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   }
   roomChannel = new BroadcastChannel(`connect_chat_${roomCode}`);
 
-  roomChannel.onmessage = (event) => {
-    const { type, message, messageId, reactions, uid: typingUid, isTyping, textLength } = event.data || {};
+  const handleMessagePayload = (data) => {
+    const { type, message, messageId, typingUid, isTyping, textLength } = data || {};
     
     if (type === "CHAT_MESSAGE" && message) {
       if (!messageStore.has(message.id)) {
@@ -455,6 +462,23 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
       notifyMessages();
     }
   };
+
+  roomChannel.onmessage = (event) => handleMessagePayload(event.data);
+
+  // Cross-device SSE listener over ntfy.sh
+  if (ntfyChatEventSource) ntfyChatEventSource.close();
+  try {
+    ntfyChatEventSource = new EventSource(`https://ntfy.sh/connect_chat_msg_${roomCode}/json`);
+    ntfyChatEventSource.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed && parsed.message) {
+          const payload = JSON.parse(parsed.message);
+          handleMessagePayload(payload);
+        }
+      } catch (e) {}
+    };
+  } catch (e) {}
 
   let unsubFirestore = null;
   if (isConfigured) {
@@ -507,6 +531,10 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   notifyMessages();
 
   return () => {
+    if (ntfyChatEventSource) {
+      ntfyChatEventSource.close();
+      ntfyChatEventSource = null;
+    }
     if (unsubFirestore) unsubFirestore();
     if (roomChannel) {
       roomChannel.close();
@@ -521,5 +549,6 @@ export function purgeLocalMessages(roomCode) {
   if (roomChannel) {
     roomChannel.postMessage({ type: "PURGE_CHAT" });
   }
+  publishNtfyMessage(roomCode, { type: "PURGE_CHAT" });
   notifyMessages();
 }

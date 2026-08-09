@@ -637,7 +637,7 @@ async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = n
           startChatSession();
         }
       }
-    }, currentUid);
+    });
   } catch (err) {
     showToast(err.message || "Failed to create room.");
   }
@@ -692,8 +692,7 @@ function startChatSession() {
     if (!roomData || roomData.status === "ended") {
       onSessionEnded();
     }
-  }, currentUid);
-
+  });
 }
 
 async function handleCancelRoom() {
