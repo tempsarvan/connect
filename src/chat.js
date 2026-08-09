@@ -14,12 +14,15 @@ const typingUsers = new Map(); // uid -> { isTyping, textLength }
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
 
-// Persistent User Settings & System Memory
+// Persistent Device Session & System Memory (3 Days Inactivity Expiry Threshold)
+const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000; // 3 Days
+
 let currentUsername = localStorage.getItem("connect_username") || "";
 let currentPassword = localStorage.getItem("connect_password") || "";
 let isSoundEnabled = localStorage.getItem("connect_sound_enabled") !== "false";
 let isVaultEnabled = localStorage.getItem("connect_vault_enabled") !== "false";
 let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
+let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_timestamp") || "0", 10);
 let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
 
 let peerVaultDisabled = false;
@@ -28,18 +31,36 @@ export function hasCompletedSetup() {
   return isSetupCompleted && currentUsername.trim().length > 0;
 }
 
+export function hasValidSession() {
+  if (!hasCompletedSetup()) return false;
+  if (!lastActiveTimestamp) return false;
+
+  const now = Date.now();
+  const diff = now - lastActiveTimestamp;
+  return diff < SESSION_EXPIRY_MS;
+}
+
+export function touchSession() {
+  if (hasCompletedSetup()) {
+    lastActiveTimestamp = Date.now();
+    localStorage.setItem("connect_last_active_timestamp", lastActiveTimestamp.toString());
+  }
+}
+
 export function saveUserSettings(name, password, soundOn = true, vaultOn = true) {
   currentUsername = name.trim() || "Anonymous";
   currentPassword = password.trim();
   isSoundEnabled = soundOn;
   isVaultEnabled = vaultOn;
   isSetupCompleted = true;
+  lastActiveTimestamp = Date.now();
 
   localStorage.setItem("connect_username", currentUsername);
   localStorage.setItem("connect_password", currentPassword);
   localStorage.setItem("connect_sound_enabled", isSoundEnabled ? "true" : "false");
   localStorage.setItem("connect_vault_enabled", isVaultEnabled ? "true" : "false");
   localStorage.setItem("connect_setup_completed", "true");
+  localStorage.setItem("connect_last_active_timestamp", lastActiveTimestamp.toString());
 
   if (roomChannel) {
     roomChannel.postMessage({
@@ -141,6 +162,8 @@ export async function sendMessage(roomCode, uid, payload) {
   const senderName = getUsername();
 
   if (!text.trim() && !mediaUrl && !soundFx) return;
+
+  touchSession(); // Touch active session on sending message
 
   // Clear local typing status once message is sent
   sendTypingIndicator(roomCode, uid, false, 0);

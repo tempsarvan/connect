@@ -13,6 +13,8 @@ import {
   sendTypingIndicator, 
   listenToTyping,
   hasCompletedSetup,
+  hasValidSession,
+  touchSession,
   saveUserSettings,
   getUsername,
   getPassword,
@@ -92,6 +94,11 @@ async function init() {
   // Always show Showcase Product Landing Page first
   showView("showcase");
 
+  // Touch active session if valid
+  if (hasValidSession()) {
+    touchSession();
+  }
+
   initMediaPopovers(handleSendGif, handleSendSticker);
   initEmojiPanel(handleSelectEmoji);
   initDoodleStudio(handleSendDoodle);
@@ -102,11 +109,12 @@ async function init() {
 }
 
 function enterConnectApp() {
-  if (!hasCompletedSetup()) {
-    showView("setup");
-  } else {
+  if (hasValidSession()) {
+    touchSession();
     updateProfileUI();
     showView("landing");
+  } else {
+    showView("setup");
   }
 }
 
