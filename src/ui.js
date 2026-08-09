@@ -21,7 +21,16 @@ export const buttons = {
   recordVoice: document.getElementById("btn-record-voice"),
   cancelVoice: document.getElementById("btn-cancel-voice"),
   cancelReply: document.getElementById("btn-cancel-reply"),
-  closeLightbox: document.getElementById("btn-close-lightbox")
+  closeLightbox: document.getElementById("btn-close-lightbox"),
+  notifications: document.getElementById("btn-notifications"),
+  clearNotifications: document.getElementById("btn-clear-notifications"),
+  audioCall: document.getElementById("btn-audio-call"),
+  videoCall: document.getElementById("btn-video-call"),
+  acceptCall: document.getElementById("btn-accept-call"),
+  declineCall: document.getElementById("btn-decline-call"),
+  callToggleMic: document.getElementById("btn-call-toggle-mic"),
+  callToggleCam: document.getElementById("btn-call-toggle-cam"),
+  callEnd: document.getElementById("btn-call-end")
 };
 
 export const inputs = {
@@ -47,7 +56,17 @@ export const displays = {
   voiceRecordingBar: document.getElementById("voice-recording-bar"),
   voiceRecTimer: document.getElementById("voice-rec-timer"),
   lightboxModal: document.getElementById("lightbox-modal"),
-  lightboxImg: document.getElementById("lightbox-img")
+  lightboxImg: document.getElementById("lightbox-img"),
+  popoverNotifications: document.getElementById("popover-notifications"),
+  notificationsList: document.getElementById("notifications-list"),
+  notifBadge: document.getElementById("notif-badge"),
+  incomingCallModal: document.getElementById("incoming-call-modal"),
+  incomingCallTitle: document.getElementById("incoming-call-title"),
+  callOverlay: document.getElementById("call-overlay"),
+  remoteVideo: document.getElementById("remote-video"),
+  localVideo: document.getElementById("local-video"),
+  audioCallAvatar: document.getElementById("audio-call-avatar"),
+  callStatusText: document.getElementById("call-status-text")
 };
 
 let toastTimeout = null;
@@ -99,6 +118,35 @@ export function showReplyPreview(msgText) {
 export function hideReplyPreview() {
   displays.replyPreviewBar.classList.add("hidden");
   displays.replyPreviewText.textContent = "";
+}
+
+export function renderNotifications(notificationsList, unreadCount) {
+  if (unreadCount > 0) {
+    displays.notifBadge.textContent = unreadCount;
+    displays.notifBadge.classList.remove("hidden");
+  } else {
+    displays.notifBadge.classList.add("hidden");
+  }
+
+  displays.notificationsList.innerHTML = "";
+  if (notificationsList.length === 0) {
+    displays.notificationsList.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.8rem;">No recent notifications</div>`;
+    return;
+  }
+
+  notificationsList.forEach((n) => {
+    const item = document.createElement("div");
+    item.className = `notif-item ${!n.read ? "unread" : ""}`;
+    item.innerHTML = `
+      <div class="notif-icon">${n.icon}</div>
+      <div class="notif-content">
+        <div class="notif-title">${n.title}</div>
+        <div class="notif-body">${n.body}</div>
+        <div class="notif-time">${n.time}</div>
+      </div>
+    `;
+    displays.notificationsList.appendChild(item);
+  });
 }
 
 export function initMediaPopovers(onSelectGif, onSelectSticker) {
@@ -205,7 +253,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     
     row.className = `msg-row ${isMe ? "me" : "peer"}`;
 
-    // Quoted reply
     if (msg.replyTo) {
       const quote = document.createElement("div");
       quote.className = "msg-reply-quote";
@@ -216,7 +263,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
 
-    // Media Types
     if (msg.mediaType === "image" && msg.mediaUrl) {
       const img = document.createElement("img");
       img.src = msg.mediaUrl;
@@ -254,7 +300,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
 
     row.appendChild(bubble);
 
-    // Reactions bar
     if (msg.reactions && Object.keys(msg.reactions).length > 0) {
       const rxBar = document.createElement("div");
       rxBar.className = "reactions-bar";
@@ -270,7 +315,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       row.appendChild(rxBar);
     }
 
-    // Hover Actions Bar
     const actions = document.createElement("div");
     actions.className = "msg-actions";
     
@@ -290,7 +334,6 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
 
     row.appendChild(actions);
 
-    // Timestamp
     const time = document.createElement("div");
     time.className = "msg-time";
     time.textContent = msg.localTime || "";
@@ -299,6 +342,5 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     displays.messagesList.appendChild(row);
   });
 
-  // Smooth scroll to bottom
   displays.messagesContainer.scrollTop = displays.messagesContainer.scrollHeight;
 }

@@ -21,6 +21,14 @@ import {
   processImageFile, 
   VoiceRecorder 
 } from "./media";
+import { soundEngine } from "./sound";
+import { 
+  addNotification, 
+  markAllAsRead, 
+  clearNotifications, 
+  listenToNotifications 
+} from "./notifications";
+import { callManager } from "./call";
 import { 
   views, 
   buttons, 
@@ -31,6 +39,7 @@ import {
   showOverlayDisconnected, 
   hideOverlayDisconnected, 
   renderMessages,
+  renderNotifications,
   initMediaPopovers,
   showReplyPreview,
   hideReplyPreview,
@@ -48,6 +57,8 @@ let voiceRecorder = null;
 let voiceTimerInterval = null;
 let voiceStartTime = 0;
 let typingTimeout = null;
+let pendingIncomingOffer = null;
+let pendingCallIsVideo = true;
 
 async function init() {
   setupEventListeners();
@@ -58,12 +69,15 @@ async function init() {
     currentUid = getUserUid();
   }
 
-  // Initialize popovers
   initMediaPopovers(handleSendGif, handleSendSticker);
+  
+  listenToNotifications((notifs, unread) => {
+    renderNotifications(notifs, unread);
+  });
 }
 
 function setupEventListeners() {
-  // 1. Navigation & Rooms
+  // Navigation & Rooms
   buttons.create.addEventListener("click", handleCreateRoom);
   buttons.join.addEventListener("click", handleJoinRoom);
 
@@ -86,7 +100,7 @@ function setupEventListeners() {
   buttons.endSession.addEventListener("click", handleEndSession);
   buttons.returnHome.addEventListener("click", handleReturnHome);
 
-  // 2. Chat Input & Typing
+  // Chat Input & Typing
   buttons.send.addEventListener("click", handleSendMessage);
   inputs.message.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -97,11 +111,12 @@ function setupEventListeners() {
 
   inputs.message.addEventListener("input", handleTypingEvent);
 
-  // 3. Media Attachments
+  // Media Attachments
   inputs.photoUpload.addEventListener("change", handlePhotoUpload);
 
   buttons.toggleGifs.addEventListener("click", () => {
     displays.popoverStickers.classList.add("hidden");
+    displays.popoverNotifications.classList.add("hidden");
     displays.popoverGifs.classList.toggle("hidden");
   });
 
@@ -111,6 +126,7 @@ function setupEventListeners() {
 
   buttons.toggleStickers.addEventListener("click", () => {
     displays.popoverGifs.classList.add("hidden");
+    displays.popoverNotifications.classList.add("hidden");
     displays.popoverStickers.classList.toggle("hidden");
   });
 
@@ -118,11 +134,45 @@ function setupEventListeners() {
     displays.popoverStickers.classList.add("hidden");
   });
 
-  // 4. Voice Recorder
+  // Notifications Drawer
+  buttons.notifications.addEventListener("click", () => {
+    displays.popoverGifs.classList.add("hidden");
+    displays.popoverStickers.classList.add("hidden");
+    displays.popoverNotifications.classList.toggle("hidden");
+    markAllAsRead();
+  });
+
+  buttons.clearNotifications.addEventListener("click", () => {
+    clearNotifications();
+  });
+
+  // Calling Handlers
+  buttons.audioCall.addEventListener("click", () => handleStartCall(false));
+  buttons.videoCall.addEventListener("click", () => handleStartCall(true));
+  buttons.acceptCall.addEventListener("click", handleAcceptCall);
+  buttons.declineCall.addEventListener("click", handleDeclineCall);
+
+  buttons.callToggleMic.addEventListener("click", () => {
+    const isMuted = callManager.toggleMic();
+    buttons.callToggleMic.style.background = isMuted ? "var(--danger)" : "var(--surface)";
+    showToast(isMuted ? "Microphone Muted" : "Microphone Active");
+  });
+
+  buttons.callToggleCam.addEventListener("click", () => {
+    const isOff = callManager.toggleCamera();
+    buttons.callToggleCam.style.background = isOff ? "var(--danger)" : "var(--surface)";
+    showToast(isOff ? "Camera Off" : "Camera On");
+  });
+
+  buttons.callEnd.addEventListener("click", () => {
+    callManager.stopCall("Call ended");
+  });
+
+  // Voice Recorder
   buttons.recordVoice.addEventListener("click", handleToggleVoiceRecord);
   buttons.cancelVoice.addEventListener("click", handleCancelVoiceRecord);
 
-  // 5. Reply Cancel & Lightbox Close
+  // Reply Cancel & Lightbox Close
   buttons.cancelReply.addEventListener("click", () => {
     currentReplyMessage = null;
     hideReplyPreview();
@@ -133,7 +183,6 @@ function setupEventListeners() {
 
 function handleTypingEvent() {
   if (!currentRoomCode || !currentUid) return;
-  
   sendTypingIndicator(currentRoomCode, currentUid, true);
   
   if (typingTimeout) clearTimeout(typingTimeout);
@@ -202,9 +251,68 @@ function startChatSession() {
   showView("chat");
   setTimeout(() => inputs.message.focus(), 100);
 
+  addNotification("Room Active", `Connected to room ${currentRoomCode}`, "🔒");
+
+  // Setup Calling Manager for room
+  callManager.init(currentRoomCode, currentUid);
+
+  callManager.onIncomingCall = ({ senderUid, isVideo, offer }) => {
+    pendingIncomingOffer = offer;
+    pendingCallIsVideo = isVideo;
+
+    soundEngine.playRingtone();
+    addNotification("Incoming Call", `${isVideo ? "Video" : "Voice"} call request`, "📞");
+
+    displays.incomingCallTitle.textContent = `Incoming ${isVideo ? "Video" : "Voice"} Call...`;
+    displays.incomingCallModal.classList.remove("hidden");
+  };
+
+  callManager.onCallStateChange = ({ status, localStream, reason }) => {
+    if (status === "calling" || status === "connected") {
+      displays.callOverlay.classList.remove("hidden");
+      if (localStream) {
+        displays.localVideo.srcObject = localStream;
+      }
+      if (!callManager.isVideo) {
+        displays.localVideo.classList.add("hidden");
+        displays.audioCallAvatar.classList.remove("hidden");
+      } else {
+        displays.localVideo.classList.remove("hidden");
+        displays.audioCallAvatar.classList.add("hidden");
+      }
+    } else if (status === "ended") {
+      displays.callOverlay.classList.add("hidden");
+      displays.incomingCallModal.classList.add("hidden");
+      displays.localVideo.srcObject = null;
+      displays.remoteVideo.srcObject = null;
+      if (reason) showToast(reason);
+    }
+  };
+
+  callManager.onRemoteStream = (remoteStream) => {
+    displays.remoteVideo.srcObject = remoteStream;
+  };
+
   // Listen to chat messages
+  let previousMsgCount = 0;
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
+    // Play chime & log notification on new peer message
+    if (messages.length > previousMsgCount && previousMsgCount > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.sender !== currentUid) {
+        soundEngine.playMessageDing();
+        
+        let notifText = lastMsg.text;
+        if (lastMsg.mediaType === "image") notifText = "Sent a photo";
+        else if (lastMsg.mediaType === "gif") notifText = "Sent a GIF";
+        else if (lastMsg.mediaType === "sticker") notifText = "Sent a sticker";
+        else if (lastMsg.mediaType === "audio") notifText = "Sent a voice note";
+
+        addNotification("New Message", notifText, "💬");
+      }
+    }
+    previousMsgCount = messages.length;
     renderMessages(messages, currentUid, handleReactionClick, handleReplyClick);
   });
 
@@ -227,7 +335,36 @@ function startChatSession() {
   });
 }
 
-// Media Action Handlers
+// Call Action Handlers
+async function handleStartCall(isVideo) {
+  if (!currentRoomCode || !currentUid) return;
+  try {
+    addNotification("Starting Call", `Calling peer...`, "📞");
+    await callManager.startCall(currentRoomCode, currentUid, isVideo);
+  } catch (err) {
+    showToast(err.message || "Failed to start call.");
+  }
+}
+
+async function handleAcceptCall() {
+  displays.incomingCallModal.classList.add("hidden");
+  if (!currentRoomCode || !currentUid || !pendingIncomingOffer) return;
+
+  try {
+    await callManager.acceptCall(currentRoomCode, currentUid, pendingCallIsVideo, pendingIncomingOffer);
+  } catch (err) {
+    showToast("Could not accept call: " + err.message);
+  }
+}
+
+function handleDeclineCall() {
+  displays.incomingCallModal.classList.add("hidden");
+  if (currentRoomCode && currentUid) {
+    callManager.declineCall(currentRoomCode, currentUid);
+  }
+}
+
+// Chat Action Handlers
 async function handleSendMessage() {
   const text = inputs.message.value.trim();
   if (!text || !currentRoomCode) return;
@@ -287,7 +424,6 @@ async function handleSendSticker(stickerUrl) {
 
 async function handleToggleVoiceRecord() {
   if (voiceRecorder) {
-    // Stop & Send
     try {
       clearInterval(voiceTimerInterval);
       displays.voiceRecordingBar.classList.add("hidden");
@@ -304,7 +440,6 @@ async function handleToggleVoiceRecord() {
       showToast("Voice recording failed: " + err.message);
     }
   } else {
-    // Start Recording
     try {
       voiceRecorder = new VoiceRecorder();
       await voiceRecorder.start();
@@ -357,6 +492,7 @@ async function handleCancelRoom() {
 
 async function handleEndSession() {
   if (currentRoomCode) {
+    callManager.stopCall();
     await destroyRoomSession(currentRoomCode);
   }
   onSessionEnded();
@@ -364,6 +500,8 @@ async function handleEndSession() {
 
 function onSessionEnded() {
   unregisterUnloadCleanup();
+  callManager.stopCall();
+
   if (chatUnsubscribe) {
     chatUnsubscribe();
     chatUnsubscribe = null;
@@ -386,6 +524,7 @@ function handleReturnHome() {
 
 function resetAppState() {
   unregisterUnloadCleanup();
+  callManager.stopCall();
   currentRoomCode = null;
   currentReplyMessage = null;
   
@@ -410,6 +549,7 @@ function resetAppState() {
   hideReplyPreview();
   displays.popoverGifs.classList.add("hidden");
   displays.popoverStickers.classList.add("hidden");
+  displays.popoverNotifications.classList.add("hidden");
 
   showView("landing");
 }
