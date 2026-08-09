@@ -224,8 +224,8 @@
 
 .btn-icon:hover {
   background: var(--surface-hover);
-  color: var(--text);
-  transform: scale(1.05);
+  color: #ffffff;
+  transform: scale(1.08);
 }
 
 /* Call Header Buttons */
@@ -1031,7 +1031,7 @@
   transform: translateY(-1px);
 }
 
-/* Input Wrapper & Effect Selector */
+/* Input Wrapper & Minimalist Emoji Dropdown */
 .input-wrapper {
   flex: 1;
   position: relative;
@@ -1045,8 +1045,8 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0 100px 0 var(--space-md);
-  font-size: 0.92rem;
+  padding: 0 46px 0 var(--space-md);
+  font-size: 0.95rem;
   color: var(--text);
   transition: border-color var(--transition-fast);
 }
@@ -1055,23 +1055,68 @@
   border-color: var(--border-strong);
 }
 
+/* Minimalist Emoji-Only Pill Selector */
 .select-effect-mode {
   position: absolute;
-  right: 6px;
-  height: 32px;
+  right: 8px;
+  height: 30px;
+  width: 32px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: #ffffff;
   border-radius: var(--radius-sm);
-  font-size: 0.72rem;
-  padding: 0 4px;
+  font-size: 1.05rem;
+  padding: 0;
+  text-align: center;
   outline: none;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.select-effect-mode option {
+  background: #18181b;
+  color: #ffffff;
+  font-size: 1.1rem;
 }
 
 .select-effect-mode:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: var(--border-strong);
+  transform: scale(1.08);
+}
+
+/* High-Visibility Paper Airplane Send Button */
+.btn-send {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: #ffffff !important;
+  color: #000000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0;
+  border: none;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(255,255,255,0.2);
+}
+
+.btn-send:hover {
+  transform: scale(1.06);
+  opacity: 0.95;
+}
+
+.btn-send svg {
+  width: 20px;
+  height: 20px;
+  stroke: #000000 !important;
+  display: block !important;
 }
 
 /* Reply Preview & Input Bar */
@@ -1211,23 +1256,6 @@
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-.btn-send {
-  width: 46px;
-  height: 46px;
-  border-radius: var(--radius-md);
-  background: #ffffff;
-  color: #000000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: transform var(--transition-fast);
-}
-
-.btn-send:hover {
-  transform: scale(1.04);
 }
 
 .lightbox-modal {
