@@ -14,6 +14,37 @@ const typingUsers = new Set();
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
 
+// Persistent Local User Profile & Saved Vault Memory
+let currentUsername = localStorage.getItem("connect_username") || "Anonymous";
+let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
+
+export function setUsername(name) {
+  currentUsername = name.trim() || "Anonymous";
+  localStorage.setItem("connect_username", currentUsername);
+  return currentUsername;
+}
+
+export function getUsername() {
+  return currentUsername;
+}
+
+export function getSavedVaultMessages() {
+  return savedVaultMessages;
+}
+
+export function saveMessageToVault(msg) {
+  if (!savedVaultMessages.some((m) => m.id === msg.id)) {
+    savedVaultMessages.push(msg);
+    localStorage.setItem("connect_saved_vault", JSON.stringify(savedVaultMessages));
+  }
+}
+
+export function removeSavedMessageFromVault(msgId) {
+  savedVaultMessages = savedVaultMessages.filter((m) => m.id !== msgId);
+  localStorage.setItem("connect_saved_vault", JSON.stringify(savedVaultMessages));
+  return savedVaultMessages;
+}
+
 export function sendTypingIndicator(roomCode, uid, isTyping) {
   if (roomChannel) {
     roomChannel.postMessage({
@@ -50,6 +81,7 @@ export async function sendMessage(roomCode, uid, payload) {
   const fileName = typeof payload === "object" ? payload.fileName || null : null;
   const fileSize = typeof payload === "object" ? payload.fileSize || null : null;
   const soundFx = typeof payload === "object" ? payload.soundFx || null : null;
+  const senderName = currentUsername;
 
   if (!text.trim() && !mediaUrl && !soundFx) return;
 
@@ -59,6 +91,7 @@ export async function sendMessage(roomCode, uid, payload) {
   const msgObj = {
     id: msgId,
     sender: uid,
+    senderName,
     text: text.trim(),
     mediaType,
     mediaUrl,
@@ -90,6 +123,7 @@ export async function sendMessage(roomCode, uid, payload) {
   if (isConfigured) {
     withTimeout(addDoc(collection(db, "rooms", roomCode, "messages"), {
       sender: uid,
+      senderName,
       text: text.trim(),
       mediaType,
       mediaUrl,
@@ -102,6 +136,18 @@ export async function sendMessage(roomCode, uid, payload) {
       localTime: timeStr,
       timestamp: serverTimestamp()
     }), 1000).catch(() => {});
+  }
+}
+
+export function deleteMessage(roomCode, messageId) {
+  messageStore.delete(messageId);
+  notifyMessages();
+
+  if (roomChannel) {
+    roomChannel.postMessage({
+      type: "DELETE_MESSAGE",
+      messageId
+    });
   }
 }
 
@@ -150,6 +196,9 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
         messageStore.set(message.id, message);
         notifyMessages();
       }
+    } else if (type === "DELETE_MESSAGE" && messageId) {
+      messageStore.delete(messageId);
+      notifyMessages();
     } else if (type === "MESSAGE_REACTION" && messageId) {
       const existing = messageStore.get(messageId);
       if (existing) {
@@ -193,6 +242,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
               messageStore.set(id, {
                 id,
                 sender: data.sender,
+                senderName: data.senderName || "Anonymous",
                 text: data.text || "",
                 mediaType: data.mediaType || "text",
                 mediaUrl: data.mediaUrl || null,

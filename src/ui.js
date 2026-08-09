@@ -14,6 +14,17 @@ export const buttons = {
   endSession: document.getElementById("btn-end-session"),
   send: document.getElementById("btn-send"),
   returnHome: document.getElementById("btn-return-home"),
+  profileLanding: document.getElementById("btn-profile-landing"),
+  profileHeader: document.getElementById("btn-profile-header"),
+  saveProfile: document.getElementById("btn-save-profile"),
+  closeProfile: document.getElementById("btn-close-profile"),
+  toggleSaved: document.getElementById("btn-toggle-saved"),
+  closeSaved: document.getElementById("btn-close-saved"),
+  closeContext: document.getElementById("btn-close-context"),
+  contextReply: document.getElementById("btn-context-reply"),
+  contextSave: document.getElementById("btn-context-save"),
+  contextCopy: document.getElementById("btn-context-copy"),
+  contextDelete: document.getElementById("btn-context-delete"),
   toggleEmojis: document.getElementById("btn-toggle-emojis"),
   closeEmojis: document.getElementById("btn-close-emojis"),
   toggleGifs: document.getElementById("btn-toggle-gifs"),
@@ -41,6 +52,7 @@ export const buttons = {
 export const inputs = {
   code: document.getElementById("input-code"),
   message: document.getElementById("input-message"),
+  username: document.getElementById("input-username"),
   photoUpload: document.getElementById("input-photo-upload"),
   fileUpload: document.getElementById("input-file-upload"),
   selectEffectMode: document.getElementById("select-effect-mode")
@@ -54,6 +66,13 @@ export const displays = {
   overlayDisconnected: document.getElementById("overlay-disconnected"),
   toast: document.getElementById("toast"),
   typingIndicator: document.getElementById("typing-indicator"),
+  popoverProfile: document.getElementById("popover-profile"),
+  landingUsernameLabel: document.getElementById("landing-username-label"),
+  chatHeaderUsername: document.getElementById("chat-header-username"),
+  popoverSaved: document.getElementById("popover-saved"),
+  savedVaultList: document.getElementById("saved-vault-list"),
+  contextMenuModal: document.getElementById("context-menu-modal"),
+  contextMenuPreview: document.getElementById("context-menu-preview"),
   popoverEmojis: document.getElementById("popover-emojis"),
   emojiCategories: document.getElementById("emoji-categories"),
   emojisGrid: document.getElementById("emojis-grid"),
@@ -133,6 +152,28 @@ export function showReplyPreview(msgText) {
 export function hideReplyPreview() {
   displays.replyPreviewBar.classList.add("hidden");
   displays.replyPreviewText.textContent = "";
+}
+
+export function renderSavedVault(savedMessages, onRemoveSaved) {
+  displays.savedVaultList.innerHTML = "";
+  if (savedMessages.length === 0) {
+    displays.savedVaultList.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.8rem;">No saved vault messages yet</div>`;
+    return;
+  }
+
+  savedMessages.forEach((msg) => {
+    const item = document.createElement("div");
+    item.className = "saved-vault-item";
+    item.innerHTML = `
+      <div class="saved-vault-header">
+        <span>${msg.senderName || 'Peer'} • ${msg.localTime || ''}</span>
+        <button class="btn-remove-saved">Remove ✕</button>
+      </div>
+      <div class="saved-vault-text">${msg.text || (msg.mediaType === 'image' ? '[Photo]' : msg.mediaType === 'audio' ? '[Voice Note]' : '[Media]')}</div>
+    `;
+    item.querySelector(".btn-remove-saved").onclick = () => onRemoveSaved(msg.id);
+    displays.savedVaultList.appendChild(item);
+  });
 }
 
 export function renderNotifications(notificationsList, unreadCount) {
@@ -336,7 +377,8 @@ function createCustomAudioPlayer(audioUrl) {
     playBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
   };
 
-  playBtn.onclick = () => {
+  playBtn.onclick = (e) => {
+    e.stopPropagation();
     if (audio.paused) {
       audio.play();
       container.classList.add("playing");
@@ -403,7 +445,7 @@ export function triggerConfettiEffect() {
   setTimeout(() => container.remove(), 2500);
 }
 
-export function renderMessages(messages, currentUid, onReactionClick, onReplyClick) {
+export function renderMessages(messages, currentUid, onReactionClick, onReplyClick, onMessageClick) {
   displays.messagesList.innerHTML = "";
 
   if (messages.length === 0) {
@@ -422,6 +464,12 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     if (msg.effectMode === "shake") rowClasses += " effect-shake";
     row.className = rowClasses;
 
+    // Display Sender Name Badge
+    const nameBadge = document.createElement("div");
+    nameBadge.className = "msg-sender-name";
+    nameBadge.textContent = isMe ? "You" : (msg.senderName || "Peer");
+    row.appendChild(nameBadge);
+
     if (msg.replyTo) {
       const quote = document.createElement("div");
       quote.className = "msg-reply-quote";
@@ -431,6 +479,7 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
 
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
+    bubble.onclick = () => onMessageClick(msg);
 
     if (msg.mediaType === "sound_fx") {
       const card = document.createElement("div");
@@ -451,7 +500,7 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
         <div class="msg-file-info">
           <span class="msg-file-name">${msg.fileName || "Document"}</span>
           <span class="msg-file-size">${msg.fileSize || "File"}</span>
-          <a href="${msg.mediaUrl}" download="${msg.fileName || 'file'}" class="msg-file-download">⬇️ Download File</a>
+          <a href="${msg.mediaUrl}" download="${msg.fileName || 'file'}" class="msg-file-download" onclick="event.stopPropagation()">⬇️ Download File</a>
         </div>
       `;
       bubble.appendChild(card);
@@ -460,7 +509,10 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       img.src = msg.mediaUrl;
       img.className = "msg-media-img";
       img.alt = "Shared photo";
-      img.onclick = () => openLightbox(msg.mediaUrl);
+      img.onclick = (e) => {
+        e.stopPropagation();
+        openLightbox(msg.mediaUrl);
+      };
       bubble.appendChild(img);
       if (msg.text) {
         const textNode = document.createElement("div");
@@ -500,7 +552,10 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
           const chip = document.createElement("span");
           chip.className = `reaction-chip ${uids.includes(currentUid) ? "active" : ""}`;
           chip.textContent = `${emoji} ${uids.length}`;
-          chip.onclick = () => onReactionClick(msg.id, emoji);
+          chip.onclick = (e) => {
+            e.stopPropagation();
+            onReactionClick(msg.id, emoji);
+          };
           rxBar.appendChild(chip);
         }
       });
@@ -514,14 +569,20 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       const btn = document.createElement("button");
       btn.className = "msg-action-btn";
       btn.textContent = emoji;
-      btn.onclick = () => onReactionClick(msg.id, emoji);
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        onReactionClick(msg.id, emoji);
+      };
       actions.appendChild(btn);
     });
 
     const replyBtn = document.createElement("button");
     replyBtn.className = "msg-action-btn";
     replyBtn.textContent = "↩️ reply";
-    replyBtn.onclick = () => onReplyClick(msg);
+    replyBtn.onclick = (e) => {
+      e.stopPropagation();
+      onReplyClick(msg);
+    };
     actions.appendChild(replyBtn);
 
     row.appendChild(actions);

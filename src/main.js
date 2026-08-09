@@ -7,10 +7,16 @@ import {
 } from "./room";
 import { 
   sendMessage, 
+  deleteMessage,
   listenToMessages, 
   toggleReaction, 
   sendTypingIndicator, 
-  listenToTyping 
+  listenToTyping,
+  setUsername,
+  getUsername,
+  getSavedVaultMessages,
+  saveMessageToVault,
+  removeSavedMessageFromVault
 } from "./chat";
 import { 
   destroyRoomSession, 
@@ -38,6 +44,7 @@ import {
   showOverlayDisconnected, 
   hideOverlayDisconnected, 
   renderMessages,
+  renderSavedVault,
   renderNotifications,
   initMediaPopovers,
   initEmojiPanel,
@@ -57,6 +64,7 @@ let chatUnsubscribe = null;
 let typingUnsubscribe = null;
 
 let currentReplyMessage = null;
+let selectedContextMenuMessage = null;
 let voiceRecorder = null;
 let voiceTimerInterval = null;
 let voiceStartTime = 0;
@@ -71,6 +79,7 @@ async function init() {
     currentUid = getUserUid();
   }
 
+  updateProfileUI();
   initMediaPopovers(handleSendGif, handleSendSticker);
   initEmojiPanel(handleSelectEmoji);
   initDoodleStudio(handleSendDoodle);
@@ -78,6 +87,13 @@ async function init() {
   listenToNotifications((notifs, unread) => {
     renderNotifications(notifs, unread);
   });
+}
+
+function updateProfileUI() {
+  const uname = getUsername();
+  inputs.username.value = uname;
+  displays.landingUsernameLabel.textContent = uname === "Anonymous" ? "set username" : `@${uname}`;
+  displays.chatHeaderUsername.textContent = uname;
 }
 
 function setupEventListeners() {
@@ -103,6 +119,84 @@ function setupEventListeners() {
   buttons.cancelRoom.addEventListener("click", handleCancelRoom);
   buttons.endSession.addEventListener("click", handleEndSession);
   buttons.returnHome.addEventListener("click", handleReturnHome);
+
+  // Profile Popover Handlers
+  buttons.profileLanding.addEventListener("click", () => {
+    closeAllPopovers();
+    displays.popoverProfile.classList.remove("hidden");
+  });
+
+  buttons.profileHeader.addEventListener("click", () => {
+    closeAllPopovers();
+    displays.popoverProfile.classList.remove("hidden");
+  });
+
+  buttons.closeProfile.addEventListener("click", () => {
+    displays.popoverProfile.classList.add("hidden");
+  });
+
+  buttons.saveProfile.addEventListener("click", () => {
+    const val = inputs.username.value.trim();
+    if (val) {
+      setUsername(val);
+      updateProfileUI();
+      displays.popoverProfile.classList.add("hidden");
+      showToast(`Username updated to @${val}`);
+    }
+  });
+
+  // Saved History Vault Handlers
+  buttons.toggleSaved.addEventListener("click", () => {
+    closeAllPopovers();
+    const vault = getSavedVaultMessages();
+    renderSavedVault(vault, (msgId) => {
+      const updated = removeSavedMessageFromVault(msgId);
+      renderSavedVault(updated, (id) => removeSavedMessageFromVault(id));
+      showToast("Removed from Vault");
+    });
+    displays.popoverSaved.classList.toggle("hidden");
+  });
+
+  buttons.closeSaved.addEventListener("click", () => {
+    displays.popoverSaved.classList.add("hidden");
+  });
+
+  // Context Menu Modal Handlers
+  buttons.closeContext.addEventListener("click", () => {
+    displays.contextMenuModal.classList.add("hidden");
+  });
+
+  buttons.contextReply.addEventListener("click", () => {
+    if (selectedContextMenuMessage) {
+      handleReplyClick(selectedContextMenuMessage);
+      displays.contextMenuModal.classList.add("hidden");
+    }
+  });
+
+  buttons.contextSave.addEventListener("click", () => {
+    if (selectedContextMenuMessage) {
+      saveMessageToVault(selectedContextMenuMessage);
+      displays.contextMenuModal.classList.add("hidden");
+      showToast("Saved to Vault Memory");
+    }
+  });
+
+  buttons.contextCopy.addEventListener("click", () => {
+    if (selectedContextMenuMessage) {
+      const copyVal = selectedContextMenuMessage.text || selectedContextMenuMessage.mediaUrl || "";
+      navigator.clipboard.writeText(copyVal);
+      displays.contextMenuModal.classList.add("hidden");
+      showToast("Copied to clipboard");
+    }
+  });
+
+  buttons.contextDelete.addEventListener("click", () => {
+    if (selectedContextMenuMessage && currentRoomCode) {
+      deleteMessage(currentRoomCode, selectedContextMenuMessage.id);
+      displays.contextMenuModal.classList.add("hidden");
+      showToast("Message deleted for all");
+    }
+  });
 
   // Chat Input & Typing
   buttons.send.addEventListener("click", handleSendMessage);
@@ -223,6 +317,8 @@ function setupEventListeners() {
 }
 
 function closeAllPopovers() {
+  displays.popoverProfile.classList.add("hidden");
+  displays.popoverSaved.classList.add("hidden");
   displays.popoverEmojis.classList.add("hidden");
   displays.popoverGifs.classList.add("hidden");
   displays.popoverStickers.classList.add("hidden");
@@ -249,6 +345,12 @@ function handleTypingEvent() {
   typingTimeout = setTimeout(() => {
     sendTypingIndicator(currentRoomCode, currentUid, false);
   }, 1500);
+}
+
+function handleMessageClick(msg) {
+  selectedContextMenuMessage = msg;
+  displays.contextMenuPreview.textContent = msg.text || msg.mediaType || "message";
+  displays.contextMenuModal.classList.remove("hidden");
 }
 
 async function handleCreateRoom() {
@@ -344,7 +446,7 @@ function startChatSession() {
       }
     }
     previousMsgCount = messages.length;
-    renderMessages(messages, currentUid, handleReactionClick, handleReplyClick);
+    renderMessages(messages, currentUid, handleReactionClick, handleReplyClick, handleMessageClick);
   });
 
   if (typingUnsubscribe) typingUnsubscribe();
@@ -583,6 +685,7 @@ function resetAppState() {
   displays.messagesList.innerHTML = "";
   hideReplyPreview();
   hideWipModal();
+  displays.contextMenuModal.classList.add("hidden");
   closeAllPopovers();
 
   showView("landing");

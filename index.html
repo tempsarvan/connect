@@ -24,6 +24,12 @@
           <p class="tagline">private. ephemeral. gone.</p>
         </header>
         <div class="landing-actions">
+          <!-- Profile Badge trigger -->
+          <button id="btn-profile-landing" class="btn btn-secondary profile-landing-badge">
+            <span class="avatar-icon">👤</span>
+            <span id="landing-username-label">set username</span>
+          </button>
+          
           <button id="btn-create" class="btn btn-primary">create room</button>
           <div class="divider"><span>or</span></div>
           <div class="join-group">
@@ -62,6 +68,12 @@
     <section id="view-chat" class="view">
       <header class="chat-header">
         <div class="chat-header-left">
+          <!-- Profile Settings Button -->
+          <button id="btn-profile-header" class="btn-profile-pill" title="Profile Settings">
+            <span class="avatar-icon-sm">👤</span>
+            <span id="chat-header-username" class="profile-pill-name">Anonymous</span>
+          </button>
+          
           <span class="chat-status-dot"></span>
           <div class="chat-status-info">
             <span class="chat-status-text">connected</span>
@@ -70,6 +82,13 @@
         </div>
 
         <div class="chat-header-right">
+          <!-- Saved Vault Memory Drawer Button -->
+          <button id="btn-toggle-saved" class="btn-icon btn-notifications" title="Saved History Vault">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+
           <!-- Voice Call Button -->
           <button id="btn-audio-call" class="btn-call-header" title="Start Voice Call">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -123,6 +142,29 @@
       </div>
 
       <!-- Popovers -->
+      <!-- Profile Setup Modal Popover -->
+      <div id="popover-profile" class="popover popover-profile hidden">
+        <div class="popover-header">
+          <span>User Profile</span>
+          <button id="btn-close-profile" class="btn-icon">✕</button>
+        </div>
+        <div class="profile-body">
+          <div class="profile-avatar-display">👤</div>
+          <label class="profile-input-label">Display Name / Username</label>
+          <input id="input-username" type="text" class="input-username" placeholder="e.g. @sarvan or Alex" maxlength="20">
+          <button id="btn-save-profile" class="btn btn-primary" style="width:100%; margin-top:8px;">Save Username</button>
+        </div>
+      </div>
+
+      <!-- Saved Vault Memory Drawer Popover -->
+      <div id="popover-saved" class="popover popover-saved hidden">
+        <div class="popover-header">
+          <span>Saved History Vault</span>
+          <button id="btn-close-saved" class="btn-icon">✕</button>
+        </div>
+        <div id="saved-vault-list" class="saved-vault-list"></div>
+      </div>
+
       <!-- Notifications Drawer Popover -->
       <div id="popover-notifications" class="popover popover-notifications hidden">
         <div class="popover-header">
@@ -304,6 +346,29 @@
         </button>
       </footer>
     </section>
+
+    <!-- Interactive Message Action Context Menu Modal -->
+    <div id="context-menu-modal" class="context-menu-modal hidden">
+      <div class="context-menu-card">
+        <button id="btn-close-context" class="context-close-btn" aria-label="Close">✕</button>
+        <p class="context-menu-title">Message Options</p>
+        <div id="context-menu-preview" class="context-menu-preview"></div>
+        <div class="context-menu-actions">
+          <button id="btn-context-reply" class="context-action-btn">
+            <span>↩️</span> Replying to Message
+          </button>
+          <button id="btn-context-save" class="context-action-btn">
+            <span>⭐</span> Save to Vault Memory
+          </button>
+          <button id="btn-context-copy" class="context-action-btn">
+            <span>🔗</span> Copy Message Link / Text
+          </button>
+          <button id="btn-context-delete" class="context-action-btn btn-danger-action">
+            <span>🗑️</span> Delete Message for All
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Work in Progress (WIP) Calling Modal -->
     <div id="wip-modal" class="wip-modal hidden">
