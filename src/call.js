@@ -1,15 +1,18 @@
-// WebRTC & MediaStream Peer-to-Peer Calling Module (Mobile & Desktop Optimized)
+// WebRTC & Stream Calling Engine (Mobile & Desktop Dual-Engine)
 
 let localStream = null;
+let remoteStream = null;
 let peerConnection = null;
 let callChannel = null;
-let currentFacingMode = "user"; // 'user' (front) or 'environment' (back)
+let currentFacingMode = "user";
+let pendingCandidates = [];
 
 const rtcConfig = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" }
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" }
   ]
 };
 
@@ -49,18 +52,26 @@ export class CallManager {
         if (peerConnection && answer) {
           try {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            // Process buffered ICE candidates
+            while (pendingCandidates.length > 0) {
+              const cand = pendingCandidates.shift();
+              await peerConnection.addIceCandidate(cand).catch(() => {});
+            }
             if (this.onCallStateChange) {
               this.onCallStateChange({ status: "connected", localStream });
             }
           } catch (e) {
-            console.warn("Set remote answer error:", e);
+            console.warn("Error setting remote answer:", e);
           }
         }
       } else if (type === "ICE_CANDIDATE") {
-        if (peerConnection && candidate) {
-          try {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-          } catch (e) {}
+        if (candidate) {
+          const iceCandidate = new RTCIceCandidate(candidate);
+          if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+            await peerConnection.addIceCandidate(iceCandidate).catch(() => {});
+          } else {
+            pendingCandidates.push(iceCandidate);
+          }
         }
       } else if (type === "CALL_DECLINED") {
         this.stopCall("Call declined by peer");
@@ -84,7 +95,6 @@ export class CallManager {
       frameRate: { max: 30 }
     } : false;
 
-    // Mobile immediate stream request
     return await navigator.mediaDevices.getUserMedia({
       audio: audioConstraints,
       video: videoConstraints
@@ -94,6 +104,7 @@ export class CallManager {
   async startCall(roomCode, uid, isVideo = true) {
     this.isVideo = isVideo;
     this.activeCall = true;
+    pendingCandidates = [];
 
     if (this.onCallStateChange) {
       this.onCallStateChange({ status: "requesting_permissions" });
@@ -107,7 +118,10 @@ export class CallManager {
         peerConnection.addTrack(track, localStream);
       });
 
-      const offer = await peerConnection.createOffer();
+      const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: isVideo
+      });
       await peerConnection.setLocalDescription(offer);
 
       if (callChannel) {
@@ -125,7 +139,7 @@ export class CallManager {
 
       return localStream;
     } catch (err) {
-      this.stopCall(err.message || "Camera/microphone permission denied");
+      this.stopCall(err.message || "Microphone/Camera permission denied.");
       throw err;
     }
   }
@@ -133,6 +147,7 @@ export class CallManager {
   async acceptCall(roomCode, uid, isVideo, offer) {
     this.isVideo = isVideo;
     this.activeCall = true;
+    pendingCandidates = [];
 
     if (this.onCallStateChange) {
       this.onCallStateChange({ status: "requesting_permissions" });
@@ -148,6 +163,13 @@ export class CallManager {
 
       if (offer) {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        
+        // Process buffered candidates
+        while (pendingCandidates.length > 0) {
+          const cand = pendingCandidates.shift();
+          await peerConnection.addIceCandidate(cand).catch(() => {});
+        }
+
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
@@ -166,7 +188,7 @@ export class CallManager {
 
       return localStream;
     } catch (err) {
-      this.stopCall("Call failed: " + err.message);
+      this.stopCall("Call connection failed: " + err.message);
       throw err;
     }
   }
@@ -194,8 +216,22 @@ export class CallManager {
 
     peerConnection.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
+        remoteStream = event.streams[0];
         if (this.onRemoteStream) {
-          this.onRemoteStream(event.streams[0]);
+          this.onRemoteStream(remoteStream);
+        }
+      }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+      if (peerConnection) {
+        console.log("WebRTC Connection State:", peerConnection.connectionState);
+        if (peerConnection.connectionState === "connected") {
+          if (this.onCallStateChange) {
+            this.onCallStateChange({ status: "connected", localStream });
+          }
+        } else if (peerConnection.connectionState === "disconnected" || peerConnection.connectionState === "failed") {
+          this.stopCall("Call connection disconnected");
         }
       }
     };
@@ -261,6 +297,8 @@ export class CallManager {
       localStream.getTracks().forEach((track) => track.stop());
       localStream = null;
     }
+    remoteStream = null;
+    pendingCandidates = [];
 
     if (peerConnection) {
       peerConnection.close();

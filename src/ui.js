@@ -65,6 +65,7 @@ export const displays = {
   incomingCallTitle: document.getElementById("incoming-call-title"),
   callOverlay: document.getElementById("call-overlay"),
   remoteVideo: document.getElementById("remote-video"),
+  remoteAudio: document.getElementById("remote-audio"),
   localVideo: document.getElementById("local-video"),
   audioCallAvatar: document.getElementById("audio-call-avatar"),
   callStatusText: document.getElementById("call-status-text")

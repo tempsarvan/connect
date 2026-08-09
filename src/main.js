@@ -28,7 +28,7 @@ import {
   clearNotifications, 
   listenToNotifications 
 } from "./notifications";
-import { callManager, isMobileDevice } from "./call";
+import { callManager } from "./call";
 import { 
   views, 
   buttons, 
@@ -273,7 +273,7 @@ function startChatSession() {
 
   callManager.onCallStateChange = ({ status, localStream, reason }) => {
     if (status === "requesting_permissions") {
-      showToast("Requesting camera/microphone permissions...");
+      showToast("Requesting microphone/camera permissions...");
     } else if (status === "calling" || status === "connected") {
       displays.callOverlay.classList.remove("hidden");
       
@@ -281,7 +281,7 @@ function startChatSession() {
         displays.localVideo.srcObject = localStream;
         displays.localVideo.play().catch(() => {});
       }
-      
+
       if (!callManager.isVideo) {
         displays.localVideo.classList.add("hidden");
         displays.audioCallAvatar.classList.remove("hidden");
@@ -296,13 +296,19 @@ function startChatSession() {
       displays.incomingCallModal.classList.add("hidden");
       displays.localVideo.srcObject = null;
       displays.remoteVideo.srcObject = null;
+      displays.remoteAudio.srcObject = null;
       if (reason) showToast(reason);
     }
   };
 
   callManager.onRemoteStream = (remoteStream) => {
-    displays.remoteVideo.srcObject = remoteStream;
-    displays.remoteVideo.play().catch(() => {});
+    if (callManager.isVideo) {
+      displays.remoteVideo.srcObject = remoteStream;
+      displays.remoteVideo.play().catch(() => {});
+    } else {
+      displays.remoteAudio.srcObject = remoteStream;
+      displays.remoteAudio.play().catch(() => {});
+    }
   };
 
   let previousMsgCount = 0;
