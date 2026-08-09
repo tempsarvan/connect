@@ -17,7 +17,6 @@ const messageStore = new Map();
 const typingUsers = new Map();
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
-let roomNotificationListeners = new Set();
 
 // Persistent Device Session (3 Days Inactivity Expiry Threshold)
 const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -37,17 +36,19 @@ let isVaultEnabled = localStorage.getItem("connect_vault_enabled") !== "false";
 let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
 let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_timestamp") || "0", 10);
 let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
-let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '["@alex", "@dev_master"]');
+
+// Real User Friends List (NO Placeholders)
+let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '[]');
 
 let peerVaultDisabled = false;
 
-// Dynamic Public Rooms Directory
+// Dynamic Public Rooms Directory (NO Fake Member Count Placeholders)
 export let publicRooms = JSON.parse(localStorage.getItem("connect_public_rooms") || JSON.stringify([
-  { id: "pub_general", name: "#general", topic: "General discussion & community lounge", membersCount: 142 },
-  { id: "pub_tech", name: "#tech-lounge", topic: "Technology, AI, & software engineering", membersCount: 89 },
-  { id: "pub_gaming", name: "#gaming", topic: "Gaming, esports, & streaming", membersCount: 64 },
-  { id: "pub_music", name: "#music-beats", topic: "Music, playlists, & audio production", membersCount: 51 },
-  { id: "pub_announcements", name: "#announcements", topic: "Official Connect updates & news", membersCount: 310 }
+  { id: "pub_general", name: "#general", topic: "General discussion & community lounge", membersCount: 1 },
+  { id: "pub_tech", name: "#tech-lounge", topic: "Technology, AI, & software engineering", membersCount: 0 },
+  { id: "pub_gaming", name: "#gaming", topic: "Gaming, esports, & streaming", membersCount: 0 },
+  { id: "pub_music", name: "#music-beats", topic: "Music, playlists, & audio production", membersCount: 0 },
+  { id: "pub_announcements", name: "#announcements", topic: "Official Connect updates & news", membersCount: 1 }
 ]));
 
 export function createPublicRoom(name, topic) {
@@ -63,8 +64,8 @@ export function createPublicRoom(name, topic) {
   return roomObj;
 }
 
-// Unique Username Registry (LocalStorage & Firestore)
-let registeredUsernames = JSON.parse(localStorage.getItem("connect_registered_usernames") || '{"@sarvan": "uid_owner", "@alex": "uid_alex", "@dev_master": "uid_dev"}');
+// Unique Username Registry (NO Placeholders)
+let registeredUsernames = JSON.parse(localStorage.getItem("connect_registered_usernames") || '{}');
 
 export function isUsernameTaken(username, currentUid = null) {
   const norm = username.trim().toLowerCase();

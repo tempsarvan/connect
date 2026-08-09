@@ -196,8 +196,8 @@ export function openProfileCardModal(username, isMe = true, onEditClick = null) 
 
 export function renderFriendsList(friends, onRemove, onStartPrivateChat) {
   displays.friendsListContainer.innerHTML = "";
-  if (friends.length === 0) {
-    displays.friendsListContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:0.82rem;">No friends added yet. Type a username above to connect!</div>`;
+  if (!friends || friends.length === 0) {
+    displays.friendsListContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:0.82rem;">No connected friends yet. Add friends by handle above!</div>`;
     return;
   }
 
@@ -223,7 +223,7 @@ export function renderFriendsList(friends, onRemove, onStartPrivateChat) {
 
 export function renderInviteFriendsList(friends, onInvite) {
   displays.inviteFriendsListContainer.innerHTML = "";
-  if (friends.length === 0) {
+  if (!friends || friends.length === 0) {
     displays.inviteFriendsListContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:0.82rem;">No connected friends to invite. Add friends from the main hub!</div>`;
     return;
   }
@@ -254,7 +254,7 @@ export function renderPublicRoomsExplorer(onJoinChannel) {
     card.innerHTML = `
       <div class="explorer-info">
         <span class="explorer-title">${room.name}</span>
-        <span class="explorer-sub">${room.topic} • ${room.membersCount} members</span>
+        <span class="explorer-sub">${room.topic}</span>
       </div>
       <button class="btn btn-primary btn-join-pub" style="height:34px; font-size:0.8rem; padding:0 12px;">Join Channel</button>
     `;
@@ -265,7 +265,7 @@ export function renderPublicRoomsExplorer(onJoinChannel) {
     prevBtn.className = "channel-preview-btn";
     prevBtn.innerHTML = `
       <span>${room.name}</span>
-      <span style="font-size:0.72rem; color:var(--text-dim);">${room.membersCount} members</span>
+      <span style="font-size:0.72rem; color:var(--text-dim);">Public</span>
     `;
     prevBtn.onclick = () => onJoinChannel(room);
     displays.publicChannelsListPreview.appendChild(prevBtn);
@@ -290,10 +290,15 @@ export function renderDiscordChannelsList(activeChannelId, onSelectChannel) {
 export function renderDiscordMembers(myUsername, friends, onMemberClick = null) {
   displays.discordMembersList.innerHTML = "";
   
-  const allMembers = [myUsername, ...friends, "@alex", "@dev_master", "@cyber_pilot"];
-  const unique = Array.from(new Set(allMembers));
+  // Render ONLY actual users (myUsername + actual added friends in network)
+  const actualUsers = Array.from(new Set([myUsername, ...(friends || [])])).filter(Boolean);
 
-  unique.forEach((name) => {
+  if (actualUsers.length === 0) {
+    displays.discordMembersList.innerHTML = `<div style="padding:12px; font-size:0.75rem; color:var(--text-dim); text-align:center;">No active members online</div>`;
+    return;
+  }
+
+  actualUsers.forEach((name) => {
     const item = document.createElement("div");
     item.className = "member-item";
     item.innerHTML = `
@@ -320,7 +325,7 @@ function parseFormattedText(text) {
 export function renderMessages(messages, currentUid, targetContainer = displays.messagesList) {
   targetContainer.innerHTML = "";
 
-  if (messages.length === 0) {
+  if (!messages || messages.length === 0) {
     const systemRow = document.createElement("div");
     systemRow.className = "msg-row system";
     systemRow.innerHTML = `<div class="msg-bubble">Active Room Channel. Express yourself freely.</div>`;
