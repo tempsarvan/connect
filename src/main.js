@@ -24,6 +24,7 @@ import {
   savePublicRoomToHub,
   initGlobalEvents,
   sendRoomInvitation,
+  getFriendKey,
   MAX_FILE_SIZE_BYTES,
   formatFileSize
 } from "./chat";
@@ -33,6 +34,7 @@ import {
   unregisterUnloadCleanup 
 } from "./cleanup";
 import { processImageFile } from "./media";
+import { generateQRCodeSVG } from "./qrcode";
 import { 
   views, 
   buttons, 
@@ -60,6 +62,7 @@ let roomUnsubscribe = null;
 let chatUnsubscribe = null;
 let currentAuthMode = "signup";
 let selectedBannerColor = getProfileBannerColor();
+let selectedDeviceMode = "computer"; // "computer", "tablet", "phone"
 
 async function init() {
   setupEventListeners();
@@ -74,7 +77,20 @@ async function init() {
     initThreeShowcase(displays.threeBgCanvas);
   }
 
-  showView("showcase");
+  // Auto-join via QR Code Scan Query URL Parameter e.g. ?join=X7K9P2
+  const urlParams = new URLSearchParams(window.location.search);
+  const qrJoinCode = urlParams.get("join") || urlParams.get("code");
+
+  if (qrJoinCode && qrJoinCode.length === 6) {
+    inputs.code.value = qrJoinCode.toUpperCase();
+    showView("landing");
+    setTimeout(() => {
+      handleJoinRoom();
+      showToast(`Scanned QR Code! Auto-entering room [${qrJoinCode.toUpperCase()}]...`);
+    }, 400);
+  } else {
+    showView("showcase");
+  }
 
   if (hasValidSession()) {
     touchSession();
@@ -170,6 +186,7 @@ function updateProfileUI() {
 
   inputs.settingUsername.value = uname;
   inputs.settingPassword.value = pwd;
+  inputs.settingFriendKey.value = getFriendKey();
 
   displays.landingUsernameLabel.textContent = uname;
   displays.chatHeaderUsername.textContent = uname;
@@ -181,6 +198,26 @@ function updateSavedRoomsUI() {
     inputs.code.value = code;
     handleJoinRoom();
   });
+}
+
+function updateDevicePairingUI() {
+  buttons.deviceComputer.classList.remove("active");
+  buttons.deviceTablet.classList.remove("active");
+  buttons.devicePhone.classList.remove("active");
+
+  if (selectedDeviceMode === "computer") {
+    buttons.deviceComputer.classList.add("active");
+    displays.qrCodeDisplayWrapper.classList.add("hidden");
+  } else if (selectedDeviceMode === "tablet" || selectedDeviceMode === "phone") {
+    if (selectedDeviceMode === "tablet") buttons.deviceTablet.classList.add("active");
+    if (selectedDeviceMode === "phone") buttons.devicePhone.classList.add("active");
+
+    if (currentRoomCode) {
+      const joinUrl = `${window.location.origin}/?join=${currentRoomCode}`;
+      displays.qrCodeVectorContainer.innerHTML = generateQRCodeSVG(joinUrl, 180);
+      displays.qrCodeDisplayWrapper.classList.remove("hidden");
+    }
+  }
 }
 
 function openEditProfileStudio() {
@@ -263,6 +300,20 @@ function updateFriendsUI() {
 }
 
 function setupEventListeners() {
+  // Device QR Code Pairing Tabs
+  buttons.deviceComputer?.addEventListener("click", () => {
+    selectedDeviceMode = "computer";
+    updateDevicePairingUI();
+  });
+  buttons.deviceTablet?.addEventListener("click", () => {
+    selectedDeviceMode = "tablet";
+    updateDevicePairingUI();
+  });
+  buttons.devicePhone?.addEventListener("click", () => {
+    selectedDeviceMode = "phone";
+    updateDevicePairingUI();
+  });
+
   // Upward Expanding Tools Menu Toggle
   buttons.toolsMenuToggle?.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -364,16 +415,16 @@ function setupEventListeners() {
   });
 
   buttons.addFriendSubmit.addEventListener("click", () => {
-    const handle = inputs.addFriendHandle.value.trim();
-    if (!handle) {
-      showToast("Please enter a username or handle");
+    const handleOrKey = inputs.addFriendHandle.value.trim();
+    if (!handleOrKey) {
+      showToast("Please enter a handle or Friend Key e.g. CN-9X4A-82");
       return;
     }
     try {
-      addFriend(handle);
+      addFriend(handleOrKey);
       inputs.addFriendHandle.value = "";
       updateFriendsUI();
-      showToast(`Added ${handle} to your friends list!`);
+      showToast(`Added friend connection successfully!`);
     } catch (err) {
       showToast(err.message);
     }
@@ -557,6 +608,10 @@ async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = n
 
     displays.roomCode.textContent = roomCode;
     displays.roomTypeBadgeWaiting.textContent = isPublic ? "🌐 Persistent Public Room Code" : "🔒 Ephemeral Private Room Code";
+    
+    selectedDeviceMode = "computer";
+    updateDevicePairingUI();
+
     showView("waiting");
 
     if (roomUnsubscribe) roomUnsubscribe();

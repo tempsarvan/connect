@@ -1,4 +1,4 @@
-import { getProfileBio, getCustomStatus, getProfileBannerColor } from "./chat";
+import { getProfileBio, getCustomStatus, getProfileBannerColor, getFriendKey } from "./chat";
 
 export const views = {
   showcase: document.getElementById("view-showcase"),
@@ -33,6 +33,9 @@ export const buttons = {
   inviteFriendsWaiting: document.getElementById("btn-invite-friends-waiting"),
   inviteFriendsChat: document.getElementById("btn-invite-friends-chat"),
   closeInviteFriends: document.getElementById("btn-close-invite-friends"),
+  deviceComputer: document.getElementById("btn-device-computer"),
+  deviceTablet: document.getElementById("btn-device-tablet"),
+  devicePhone: document.getElementById("btn-device-phone"),
   gearLanding: document.getElementById("btn-gear-landing"),
   gearChat: document.getElementById("btn-gear-chat"),
   closeFullscreenSettings: document.getElementById("btn-close-fullscreen-settings"),
@@ -64,6 +67,7 @@ export const inputs = {
   profileStatusInput: document.getElementById("profile-status-input"),
   settingUsername: document.getElementById("setting-input-username"),
   settingPassword: document.getElementById("setting-input-password"),
+  settingFriendKey: document.getElementById("setting-input-friend-key"),
   code: document.getElementById("input-code"),
   message: document.getElementById("input-message"),
   photoUpload: document.getElementById("input-photo-upload"),
@@ -85,11 +89,14 @@ export const displays = {
   savedPublicRoomsContainer: document.getElementById("saved-public-rooms-container"),
   savedRoomsCountBadge: document.getElementById("saved-rooms-count-badge"),
   dropdownToolsMenu: document.getElementById("dropdown-tools-menu"),
+  qrCodeDisplayWrapper: document.getElementById("qr-code-display-wrapper"),
+  qrCodeVectorContainer: document.getElementById("qr-code-vector-container"),
   modalProfileCard: document.getElementById("modal-profile-card"),
   profileCardBanner: document.getElementById("profile-card-banner"),
   profileCardHandle: document.getElementById("profile-card-handle"),
   profileCardStatus: document.getElementById("profile-card-status"),
   profileCardBio: document.getElementById("profile-card-bio"),
+  profileCardFriendKey: document.getElementById("profile-card-friend-key"),
   modalEditProfile: document.getElementById("modal-edit-profile"),
   modalSettingsFullscreen: document.getElementById("modal-settings-fullscreen"),
   roomCode: document.getElementById("room-code-display"),
@@ -156,6 +163,7 @@ export function openProfileCardModal(username, isMe = true, onEditClick = null) 
   displays.profileCardStatus.textContent = getCustomStatus();
   displays.profileCardBio.textContent = getProfileBio();
   displays.profileCardBanner.style.background = getProfileBannerColor();
+  displays.profileCardFriendKey.textContent = getFriendKey();
 
   if (isMe) {
     buttons.editProfileFromCard.style.display = "block";

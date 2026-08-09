@@ -31,11 +31,21 @@ let customStatus = localStorage.getItem("connect_custom_status") || "Online & Co
 let profileBannerColor = localStorage.getItem("connect_profile_banner") || "#3b82f6";
 let profileAvatarIcon = localStorage.getItem("connect_avatar_icon") || "code";
 
+// Generate or load permanent 8-character Unique Friend Key (e.g. CN-9X4A-82)
+let friendKey = localStorage.getItem("connect_friend_key") || "";
+if (!friendKey) {
+  const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let r1 = "", r2 = "";
+  for (let i = 0; i < 4; i++) r1 += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 2; i++) r2 += Math.floor(Math.random() * 10);
+  friendKey = `CN-${r1}-${r2}`;
+  localStorage.setItem("connect_friend_key", friendKey);
+}
+
 let isSoundEnabled = localStorage.getItem("connect_sound_enabled") !== "false";
 let isVaultEnabled = localStorage.getItem("connect_vault_enabled") !== "false";
 let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
 let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_timestamp") || "0", 10);
-let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
 
 // Real User Friends List
 let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '[]');
@@ -110,13 +120,17 @@ export async function claimUniqueUsername(username, uid) {
       if (snap.exists() && snap.data().uid !== uid) {
         throw new Error(`Username ${handle} is already claimed in the global network.`);
       }
-      await withTimeout(setDoc(userRef, { uid, claimedAt: serverTimestamp() }), 1500);
+      await withTimeout(setDoc(userRef, { uid, friendKey, claimedAt: serverTimestamp() }), 1500);
     } catch (err) {
       if (err.message && err.message.includes("already claimed")) throw err;
     }
   }
 
   return handle;
+}
+
+export function getFriendKey() {
+  return friendKey;
 }
 
 export function hasCompletedSetup() {
@@ -162,14 +176,7 @@ export function saveUserSettings(name, password, soundOn = true, vaultOn = true,
   localStorage.setItem("connect_setup_completed", "true");
   localStorage.setItem("connect_last_active_timestamp", lastActiveTimestamp.toString());
 
-  if (roomChannel) {
-    roomChannel.postMessage({
-      type: "ROOM_SETTINGS_UPDATE",
-      vaultDisabled: !isVaultEnabled
-    });
-  }
-
-  return { username: currentUsername, password: currentPassword, soundEnabled: isSoundEnabled, vaultEnabled: isVaultEnabled };
+  return { username: currentUsername, password: currentPassword, friendKey, soundEnabled: isSoundEnabled, vaultEnabled: isVaultEnabled };
 }
 
 export function saveProfileCustomization(bio, status, bannerColor, avatarIcon) {
@@ -198,10 +205,6 @@ export function getProfileBannerColor() {
   return profileBannerColor;
 }
 
-export function getProfileAvatarIcon() {
-  return profileAvatarIcon;
-}
-
 export function getUsername() {
   return currentUsername || "@anonymous";
 }
@@ -214,15 +217,26 @@ export function getFriends() {
   return friendsList;
 }
 
-export function addFriend(friendHandle) {
-  const norm = friendHandle.trim().toLowerCase();
-  const handle = norm.startsWith("@") ? norm : `@${norm}`;
+export function addFriend(inputVal) {
+  const raw = inputVal.trim();
+  let handle = raw;
 
-  if (handle === getUsername().toLowerCase()) {
+  if (!raw) {
+    throw new Error("Please enter a username or Friend Key.");
+  }
+
+  if (raw.toUpperCase().startsWith("CN-")) {
+    handle = `@user_${raw.toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
+  } else {
+    const norm = raw.toLowerCase();
+    handle = norm.startsWith("@") ? norm : `@${norm}`;
+  }
+
+  if (handle.toLowerCase() === getUsername().toLowerCase()) {
     throw new Error("You cannot add yourself as a friend.");
   }
 
-  if (friendsList.includes(handle)) {
+  if (friendsList.some((f) => f.toLowerCase() === handle.toLowerCase())) {
     throw new Error(`${handle} is already in your friends list.`);
   }
 
@@ -401,17 +415,10 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   }
   roomChannel = new BroadcastChannel(`connect_chat_${roomCode}`);
 
-  roomChannel.postMessage({
-    type: "ROOM_SETTINGS_UPDATE",
-    vaultDisabled: !isVaultEnabled
-  });
-
   roomChannel.onmessage = (event) => {
-    const { type, message, messageId, reactions, uid: typingUid, isTyping, textLength, vaultDisabled } = event.data || {};
+    const { type, message, messageId, reactions, uid: typingUid, isTyping, textLength } = event.data || {};
     
-    if (type === "ROOM_SETTINGS_UPDATE") {
-      setPeerVaultDisabled(!!vaultDisabled);
-    } else if (type === "CHAT_MESSAGE" && message) {
+    if (type === "CHAT_MESSAGE" && message) {
       if (!messageStore.has(message.id)) {
         messageStore.set(message.id, message);
         notifyMessages();
