@@ -37,34 +37,49 @@ let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true
 let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_timestamp") || "0", 10);
 let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
 
-// Real User Friends List (NO Placeholders)
+// Real User Friends List
 let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '[]');
 
 let peerVaultDisabled = false;
 
-// Dynamic Public Rooms Directory (NO Fake Member Count Placeholders)
-export let publicRooms = JSON.parse(localStorage.getItem("connect_public_rooms") || JSON.stringify([
-  { id: "pub_general", name: "#general", topic: "General discussion & community lounge", membersCount: 1 },
-  { id: "pub_tech", name: "#tech-lounge", topic: "Technology, AI, & software engineering", membersCount: 0 },
-  { id: "pub_gaming", name: "#gaming", topic: "Gaming, esports, & streaming", membersCount: 0 },
-  { id: "pub_music", name: "#music-beats", topic: "Music, playlists, & audio production", membersCount: 0 },
-  { id: "pub_announcements", name: "#announcements", topic: "Official Connect updates & news", membersCount: 1 }
-]));
+// Persistent Saved Public Rooms Section (Dynamic Expanding Array)
+let savedPublicRooms = JSON.parse(localStorage.getItem("connect_saved_public_rooms") || '[]');
 
-export function createPublicRoom(name, topic) {
-  const normName = name.trim().startsWith("#") ? name.trim() : `#${name.trim()}`;
-  const roomObj = {
-    id: "pub_" + Math.random().toString(36).substring(2, 9),
-    name: normName,
-    topic: topic.trim() || "Community public space",
-    membersCount: 1
-  };
-  publicRooms.push(roomObj);
-  localStorage.setItem("connect_public_rooms", JSON.stringify(publicRooms));
-  return roomObj;
+export function getSavedPublicRooms() {
+  return savedPublicRooms;
 }
 
-// Unique Username Registry (NO Placeholders)
+export function savePublicRoomToHub(roomCode, roomName = null, topic = null) {
+  const code = roomCode.toUpperCase();
+  const existingIdx = savedPublicRooms.findIndex((r) => r.code === code);
+  
+  const name = roomName || `Public Room ${code}`;
+  const roomTopic = topic || "Persistent community space";
+
+  const roomObj = {
+    code,
+    name,
+    topic: roomTopic,
+    lastVisitedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
+
+  if (existingIdx >= 0) {
+    savedPublicRooms[existingIdx] = roomObj;
+  } else {
+    savedPublicRooms.unshift(roomObj);
+  }
+
+  localStorage.setItem("connect_saved_public_rooms", JSON.stringify(savedPublicRooms));
+  return savedPublicRooms;
+}
+
+export function removeSavedPublicRoom(roomCode) {
+  savedPublicRooms = savedPublicRooms.filter((r) => r.code !== roomCode.toUpperCase());
+  localStorage.setItem("connect_saved_public_rooms", JSON.stringify(savedPublicRooms));
+  return savedPublicRooms;
+}
+
+// Unique Username Registry
 let registeredUsernames = JSON.parse(localStorage.getItem("connect_registered_usernames") || '{}');
 
 export function isUsernameTaken(username, currentUid = null) {

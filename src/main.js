@@ -20,8 +20,8 @@ import {
   getFriends,
   addFriend,
   removeFriend,
-  publicRooms,
-  createPublicRoom,
+  getSavedPublicRooms,
+  savePublicRoomToHub,
   initGlobalEvents,
   sendRoomInvitation,
   MAX_FILE_SIZE_BYTES,
@@ -45,24 +45,21 @@ import {
   renderMessages,
   renderFriendsList,
   renderInviteFriendsList,
-  renderPublicRoomsExplorer,
-  renderDiscordChannelsList,
-  renderDiscordMembers,
+  renderSavedPublicRooms,
   openProfileCardModal,
   closeLightbox
 } from "./ui";
 import { initThreeShowcase } from "./showcase3d";
 
 let currentRoomCode = null;
+let isCurrentRoomPublic = false;
+let currentPublicRoomInfo = null;
+
 let currentUid = null;
 let roomUnsubscribe = null;
 let chatUnsubscribe = null;
-let publicChatUnsubscribe = null;
-
-let activePublicChannel = publicRooms[0];
 let currentAuthMode = "signup";
 let selectedBannerColor = getProfileBannerColor();
-let inviteTargetMode = "private"; // "private" or "public"
 
 async function init() {
   setupEventListeners();
@@ -83,24 +80,21 @@ async function init() {
     touchSession();
   }
 
-  // Initialize Global Room Invitation Notifications Listener
+  // Initialize Global Room Invitation Listener
   initGlobalEvents(({ sender, roomCode, roomName, isPublic }) => {
-    if (isPublic) {
-      showToast(`🔔 ${sender} invited you to Public Channel ${roomName}!`, 5000);
-    } else {
-      showToast(`🔔 ${sender} invited you to Private Room [${roomCode}]!`, 6000);
-      inputs.code.value = roomCode;
-    }
+    showToast(`🔔 ${sender} invited you to ${isPublic ? 'Public' : 'Private'} Room [${roomCode}]!`, 6000);
+    inputs.code.value = roomCode;
   });
 
   updateFriendsUI();
-  updatePublicRoomsUI();
+  updateSavedRoomsUI();
 }
 
 function enterConnectApp() {
   if (hasValidSession()) {
     touchSession();
     updateProfileUI();
+    updateSavedRoomsUI();
     showView("landing");
   } else {
     openAuthModal("signup");
@@ -163,6 +157,7 @@ function handleAuthSubmit() {
     closeAuthModal();
 
     showToast(`Authenticated as ${getUsername()}. Welcome!`);
+    updateSavedRoomsUI();
     showView("landing");
   } catch (err) {
     showToast(err.message);
@@ -178,8 +173,14 @@ function updateProfileUI() {
 
   displays.landingUsernameLabel.textContent = uname;
   displays.chatHeaderUsername.textContent = uname;
-  displays.discordMyUsername.textContent = uname;
-  displays.discordMyStatus.textContent = getCustomStatus();
+}
+
+function updateSavedRoomsUI() {
+  const rooms = getSavedPublicRooms();
+  renderSavedPublicRooms(rooms, (code) => {
+    inputs.code.value = code;
+    handleJoinRoom();
+  });
 }
 
 function openEditProfileStudio() {
@@ -216,39 +217,29 @@ function openCreatePublicModal() {
   setTimeout(() => inputs.publicRoomName.focus(), 100);
 }
 
-function handleCreatePublicRoomSubmit() {
+function handleCreatePublicCodeSubmit() {
   const name = inputs.publicRoomName.value.trim();
   const topic = inputs.publicRoomTopic.value.trim();
 
   if (!name) {
-    showToast("Please enter a channel name e.g. #coding-lounge");
+    showToast("Please enter a room name e.g. Lounge, Beats, Dev Squad");
     return;
   }
 
-  const newChannel = createPublicRoom(name, topic);
   displays.modalCreatePublicRoom.classList.add("hidden");
-  updatePublicRoomsUI();
-
-  showToast(`Created ${newChannel.name}! Joining now...`);
-  openPublicWorkspace(newChannel);
+  handleCreateRoom(true, name, topic);
 }
 
-function openInviteFriendsModal(mode = "private") {
-  inviteTargetMode = mode;
+function openInviteFriendsModal() {
   const friends = getFriends();
 
   renderInviteFriendsList(friends, (friendHandle) => {
-    if (inviteTargetMode === "public") {
-      sendRoomInvitation(friendHandle, activePublicChannel.id, activePublicChannel.name, true);
-      showToast(`Sent invitation to ${friendHandle} for ${activePublicChannel.name}!`);
-    } else {
-      if (!currentRoomCode) {
-        showToast("No active private room code.");
-        return;
-      }
-      sendRoomInvitation(friendHandle, currentRoomCode, null, false);
-      showToast(`Sent private room invite [${currentRoomCode}] to ${friendHandle}!`);
+    if (!currentRoomCode) {
+      showToast("No active room code to share.");
+      return;
     }
+    sendRoomInvitation(friendHandle, currentRoomCode, currentPublicRoomInfo?.name || null, isCurrentRoomPublic);
+    showToast(`Sent ${isCurrentRoomPublic ? 'Public' : 'Private'} Room code [${currentRoomCode}] to ${friendHandle}!`);
   });
 
   displays.modalInviteFriends.classList.remove("hidden");
@@ -265,40 +256,10 @@ function updateFriendsUI() {
     },
     (friendHandle) => {
       displays.modalFriendsList.classList.add("hidden");
-      handleCreateRoom();
+      handleCreateRoom(false);
       showToast(`Starting private room for ${friendHandle}...`);
     }
   );
-}
-
-function updatePublicRoomsUI() {
-  renderPublicRoomsExplorer((channel) => {
-    displays.modalPublicRooms.classList.add("hidden");
-    openPublicWorkspace(channel);
-  });
-}
-
-function openPublicWorkspace(channel = publicRooms[0]) {
-  activePublicChannel = channel;
-  displays.discordChannelName.textContent = channel.name.replace('#', '');
-  displays.discordChannelTopic.textContent = channel.topic;
-  inputs.discordMessage.placeholder = `Message ${channel.name}... (1 TB max attachment)`;
-
-  renderDiscordChannelsList(channel.id, (selectedChan) => {
-    openPublicWorkspace(selectedChan);
-  });
-
-  renderDiscordMembers(getUsername(), getFriends(), (memberName) => {
-    const isMe = memberName === getUsername();
-    openProfileCardModal(memberName, isMe, openEditProfileStudio);
-  });
-
-  showView("publicWorkspace");
-
-  if (publicChatUnsubscribe) publicChatUnsubscribe();
-  publicChatUnsubscribe = listenToMessages(channel.id, currentUid, (messages) => {
-    renderMessages(messages, currentUid, displays.discordMessagesList);
-  });
 }
 
 function setupEventListeners() {
@@ -342,7 +303,7 @@ function setupEventListeners() {
   });
 
   buttons.navFeatures.addEventListener("click", () => {
-    document.getElementById("section-tour-sandbox")?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
   });
 
   // Auth Modal Handlers
@@ -358,7 +319,6 @@ function setupEventListeners() {
   buttons.submitAuth.addEventListener("click", handleAuthSubmit);
 
   // Profile Customization Studio Handlers
-  buttons.customizeProfileQuick.addEventListener("click", openEditProfileStudio);
   buttons.closeProfileCard.addEventListener("click", () => displays.modalProfileCard.classList.add("hidden"));
   buttons.closeEditProfile.addEventListener("click", closeEditProfileStudio);
   buttons.saveProfileCustomization.addEventListener("click", handleSaveProfileCustomization);
@@ -371,16 +331,14 @@ function setupEventListeners() {
     });
   });
 
-  // Create Public Channel Handlers
-  buttons.createPublicSidebar.addEventListener("click", openCreatePublicModal);
-  buttons.openCreatePublicModal.addEventListener("click", openCreatePublicModal);
+  // Create Public Code Handlers
+  buttons.createPublicCode.addEventListener("click", openCreatePublicModal);
   buttons.closeCreatePublic.addEventListener("click", () => displays.modalCreatePublicRoom.classList.add("hidden"));
-  buttons.submitCreatePublic.addEventListener("click", handleCreatePublicRoomSubmit);
+  buttons.submitCreatePublic.addEventListener("click", handleCreatePublicCodeSubmit);
 
   // Room Invitations Handlers
-  buttons.invitePublicChannel.addEventListener("click", () => openInviteFriendsModal("public"));
-  buttons.inviteFriendsWaiting.addEventListener("click", () => openInviteFriendsModal("private"));
-  buttons.inviteFriendsChat.addEventListener("click", () => openInviteFriendsModal("private"));
+  buttons.inviteFriendsWaiting.addEventListener("click", openInviteFriendsModal);
+  buttons.inviteFriendsChat.addEventListener("click", openInviteFriendsModal);
   buttons.closeInviteFriends.addEventListener("click", () => displays.modalInviteFriends.classList.add("hidden"));
 
   // Friends List Drawer Handlers
@@ -409,44 +367,8 @@ function setupEventListeners() {
     }
   });
 
-  // Public Rooms Explorer Handlers
-  buttons.publicExplorer.addEventListener("click", () => {
-    updatePublicRoomsUI();
-    displays.modalPublicRooms.classList.remove("hidden");
-  });
-
-  buttons.browsePublicChannels.addEventListener("click", () => {
-    updatePublicRoomsUI();
-    displays.modalPublicRooms.classList.remove("hidden");
-  });
-
-  buttons.closePublicModal.addEventListener("click", () => {
-    displays.modalPublicRooms.classList.add("hidden");
-  });
-
-  buttons.leavePublicWorkspace.addEventListener("click", () => {
-    if (publicChatUnsubscribe) {
-      publicChatUnsubscribe();
-      publicChatUnsubscribe = null;
-    }
-    showView("landing");
-  });
-
-  buttons.toggleMembersSidebar.addEventListener("click", () => {
-    displays.discordMembersSidebar.classList.toggle("open");
-  });
-
-  // Public Workspace Input Handlers
-  buttons.discordSend.addEventListener("click", handleSendDiscordMessage);
-  inputs.discordMessage.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSendDiscordMessage();
-    }
-  });
-
-  // Private Rooms Creation & Joining
-  buttons.create.addEventListener("click", handleCreateRoom);
+  // Private & Public Room Creation & Joining
+  buttons.createPrivateCode.addEventListener("click", () => handleCreateRoom(false));
   buttons.join.addEventListener("click", handleJoinRoom);
 
   inputs.code.addEventListener("keydown", (e) => {
@@ -478,7 +400,7 @@ function setupEventListeners() {
   buttons.closeFullscreenSettings.addEventListener("click", closeFullscreenSettings);
   buttons.saveFullscreenSettings.addEventListener("click", handleSaveSettings);
 
-  // Private Chat Send
+  // Chat Send
   buttons.send.addEventListener("click", handleSendMessage);
   inputs.message.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -489,10 +411,7 @@ function setupEventListeners() {
 
   // File Upload Handlers
   inputs.fileUpload.addEventListener("change", (e) => handleFileUpload(e, currentRoomCode));
-  inputs.pubFileUpload.addEventListener("change", (e) => handleFileUpload(e, activePublicChannel?.id));
-
   inputs.photoUpload.addEventListener("change", (e) => handlePhotoUpload(e, currentRoomCode));
-  inputs.pubPhotoUpload.addEventListener("change", (e) => handlePhotoUpload(e, activePublicChannel?.id));
 
   buttons.closeLightbox.addEventListener("click", closeLightbox);
 }
@@ -523,20 +442,6 @@ function handleSaveSettings() {
   } catch (err) {
     showToast(err.message);
   }
-}
-
-async function handleSendDiscordMessage() {
-  const text = inputs.discordMessage.value.trim();
-  if (!text || !activePublicChannel) return;
-
-  inputs.discordMessage.value = "";
-  
-  await sendMessage(activePublicChannel.id, currentUid, {
-    text,
-    mediaType: "text"
-  });
-
-  inputs.discordMessage.focus();
 }
 
 async function handleSendMessage() {
@@ -609,18 +514,31 @@ async function handleFileUpload(e, targetRoomId) {
   }
 }
 
-async function handleCreateRoom() {
-  buttons.create.disabled = true;
+async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = null) {
   if (!currentUid) currentUid = getUserUid();
 
   const roomCode = generateRoomCode();
+  isCurrentRoomPublic = isPublic;
   
+  if (isPublic) {
+    currentPublicRoomInfo = {
+      name: roomName || `Public Room ${roomCode}`,
+      topic: roomTopic || "Persistent community space"
+    };
+  } else {
+    currentPublicRoomInfo = null;
+  }
+
   try {
     await createRoom(roomCode, currentUid);
     currentRoomCode = roomCode;
-    registerUnloadCleanup(currentRoomCode);
+    
+    if (!isCurrentRoomPublic) {
+      registerUnloadCleanup(currentRoomCode);
+    }
 
     displays.roomCode.textContent = roomCode;
+    displays.roomTypeBadgeWaiting.textContent = isPublic ? "🌐 Persistent Public Room Code" : "🔒 Ephemeral Private Room Code";
     showView("waiting");
 
     if (roomUnsubscribe) roomUnsubscribe();
@@ -637,13 +555,11 @@ async function handleCreateRoom() {
     });
   } catch (err) {
     showToast(err.message || "Failed to create room.");
-  } finally {
-    buttons.create.disabled = false;
   }
 }
 
 async function handleJoinRoom() {
-  const code = inputs.code.value.trim();
+  const code = inputs.code.value.trim().toUpperCase();
   if (!code || code.length !== 6) {
     showToast("Please enter a valid 6-character code");
     return;
@@ -655,7 +571,18 @@ async function handleJoinRoom() {
   try {
     await joinRoom(code, currentUid);
     currentRoomCode = code;
-    registerUnloadCleanup(currentRoomCode);
+
+    // Check if room code exists in saved public rooms
+    const savedRooms = getSavedPublicRooms();
+    const match = savedRooms.find((r) => r.code === code);
+    if (match) {
+      isCurrentRoomPublic = true;
+      currentPublicRoomInfo = match;
+    } else {
+      isCurrentRoomPublic = false;
+      registerUnloadCleanup(currentRoomCode);
+    }
+
     startChatSession();
   } catch (err) {
     showToast(err.message || "Could not join room.");
@@ -666,6 +593,7 @@ async function handleJoinRoom() {
 
 function startChatSession() {
   displays.chatRoomCode.textContent = currentRoomCode;
+  displays.chatHeaderRoomType.textContent = isCurrentRoomPublic ? "🌐 public room" : "🔒 private room";
   showView("chat");
   setTimeout(() => inputs.message.focus(), 100);
 
@@ -683,14 +611,17 @@ function startChatSession() {
 }
 
 async function handleCancelRoom() {
-  if (currentRoomCode) {
+  if (currentRoomCode && !isCurrentRoomPublic) {
     await destroyRoomSession(currentRoomCode);
   }
   resetAppState();
 }
 
 async function handleEndSession() {
-  if (currentRoomCode) {
+  if (isCurrentRoomPublic && currentRoomCode) {
+    savePublicRoomToHub(currentRoomCode, currentPublicRoomInfo?.name, currentPublicRoomInfo?.topic);
+    showToast(`Saved ${currentRoomCode} to your Rooms hub.`);
+  } else if (currentRoomCode) {
     await destroyRoomSession(currentRoomCode);
   }
   onSessionEnded();
@@ -707,6 +638,13 @@ function onSessionEnded() {
     roomUnsubscribe();
     roomUnsubscribe = null;
   }
+
+  if (isCurrentRoomPublic) {
+    displays.overlaySubtitleDesc.textContent = "public room saved to your Rooms section";
+  } else {
+    displays.overlaySubtitleDesc.textContent = "all private room messages destroyed";
+  }
+
   showOverlayDisconnected();
 }
 
@@ -718,6 +656,8 @@ function handleReturnHome() {
 function resetAppState() {
   unregisterUnloadCleanup();
   currentRoomCode = null;
+  isCurrentRoomPublic = false;
+  currentPublicRoomInfo = null;
   
   if (roomUnsubscribe) {
     roomUnsubscribe();
@@ -730,11 +670,11 @@ function resetAppState() {
 
   inputs.code.value = "";
   inputs.message.value = "";
-  buttons.create.disabled = false;
   buttons.join.disabled = false;
   displays.messagesList.innerHTML = "";
 
   updateProfileUI();
+  updateSavedRoomsUI();
   showView("landing");
 }
 

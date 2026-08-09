@@ -1,11 +1,10 @@
-import { publicRooms, getProfileBio, getCustomStatus, getProfileBannerColor } from "./chat";
+import { getProfileBio, getCustomStatus, getProfileBannerColor } from "./chat";
 
 export const views = {
   showcase: document.getElementById("view-showcase"),
   landing: document.getElementById("view-landing"),
   waiting: document.getElementById("view-waiting"),
-  chat: document.getElementById("view-chat"),
-  publicWorkspace: document.getElementById("view-public-workspace")
+  chat: document.getElementById("view-chat")
 };
 
 export const buttons = {
@@ -16,9 +15,6 @@ export const buttons = {
   heroLogin: document.getElementById("btn-hero-login"),
   heroSignup: document.getElementById("btn-hero-signup"),
   startTourScroll: document.getElementById("btn-start-tour-scroll"),
-  sandboxSound: document.getElementById("btn-sandbox-sound"),
-  sandboxVault: document.getElementById("btn-sandbox-vault"),
-  sandboxConfetti: document.getElementById("btn-sandbox-confetti"),
   enterConnectFinal: document.getElementById("btn-enter-connect-final"),
   finalLogin: document.getElementById("btn-final-login"),
   closeAuthModal: document.getElementById("btn-close-auth-modal"),
@@ -28,22 +24,12 @@ export const buttons = {
   friendsDrawer: document.getElementById("btn-friends-drawer"),
   closeFriendsModal: document.getElementById("btn-close-friends-modal"),
   addFriendSubmit: document.getElementById("btn-add-friend-submit"),
-  publicExplorer: document.getElementById("btn-public-explorer"),
-  closePublicModal: document.getElementById("btn-close-public-modal"),
-  browsePublicChannels: document.getElementById("btn-browse-public-channels"),
-  leavePublicWorkspace: document.getElementById("btn-leave-public-workspace"),
-  toggleMembersSidebar: document.getElementById("btn-toggle-members-sidebar"),
-  discordSend: document.getElementById("btn-discord-send"),
-  customizeProfileQuick: document.getElementById("btn-customize-profile-quick"),
   closeProfileCard: document.getElementById("btn-close-profile-card"),
   editProfileFromCard: document.getElementById("btn-edit-profile-from-card"),
   closeEditProfile: document.getElementById("btn-close-edit-profile"),
   saveProfileCustomization: document.getElementById("btn-save-profile-customization"),
-  createPublicSidebar: document.getElementById("btn-create-public-channel-sidebar"),
-  openCreatePublicModal: document.getElementById("btn-open-create-public-modal"),
   closeCreatePublic: document.getElementById("btn-close-create-public"),
   submitCreatePublic: document.getElementById("btn-submit-create-public"),
-  invitePublicChannel: document.getElementById("btn-invite-public-channel"),
   inviteFriendsWaiting: document.getElementById("btn-invite-friends-waiting"),
   inviteFriendsChat: document.getElementById("btn-invite-friends-chat"),
   closeInviteFriends: document.getElementById("btn-close-invite-friends"),
@@ -51,7 +37,8 @@ export const buttons = {
   gearChat: document.getElementById("btn-gear-chat"),
   closeFullscreenSettings: document.getElementById("btn-close-fullscreen-settings"),
   saveFullscreenSettings: document.getElementById("btn-save-fullscreen-settings"),
-  create: document.getElementById("btn-create"),
+  createPrivateCode: document.getElementById("btn-create-private-code"),
+  createPublicCode: document.getElementById("btn-create-public-code"),
   join: document.getElementById("btn-join"),
   copyCode: document.getElementById("btn-copy-code"),
   cancelRoom: document.getElementById("btn-cancel-room"),
@@ -78,16 +65,12 @@ export const inputs = {
   settingPassword: document.getElementById("setting-input-password"),
   code: document.getElementById("input-code"),
   message: document.getElementById("input-message"),
-  discordMessage: document.getElementById("input-discord-message"),
   photoUpload: document.getElementById("input-photo-upload"),
-  fileUpload: document.getElementById("input-file-upload"),
-  pubPhotoUpload: document.getElementById("input-pub-photo-upload"),
-  pubFileUpload: document.getElementById("input-pub-file-upload")
+  fileUpload: document.getElementById("input-file-upload")
 };
 
 export const displays = {
   threeBgCanvas: document.getElementById("three-bg-canvas"),
-  sandboxPreviewOutput: document.getElementById("sandbox-preview-output"),
   modalAuthLanding: document.getElementById("modal-auth-landing"),
   authModalTitle: document.getElementById("auth-modal-title"),
   authModalDesc: document.getElementById("auth-modal-desc"),
@@ -95,21 +78,11 @@ export const displays = {
   authSubmitText: document.getElementById("auth-submit-text"),
   modalFriendsList: document.getElementById("modal-friends-list"),
   friendsListContainer: document.getElementById("friends-list-container"),
-  modalPublicRooms: document.getElementById("modal-public-rooms"),
   modalCreatePublicRoom: document.getElementById("modal-create-public-room"),
   modalInviteFriends: document.getElementById("modal-invite-friends"),
   inviteFriendsListContainer: document.getElementById("invite-friends-list-container"),
-  publicRoomsExplorerList: document.getElementById("public-rooms-explorer-list"),
-  publicChannelsListPreview: document.getElementById("public-channels-list-preview"),
-  discordChannelsList: document.getElementById("discord-channels-list"),
-  discordChannelName: document.getElementById("discord-channel-name"),
-  discordChannelTopic: document.getElementById("discord-channel-topic"),
-  discordMessagesList: document.getElementById("discord-messages-list"),
-  discordMessagesContainer: document.getElementById("discord-messages-container"),
-  discordMembersList: document.getElementById("discord-members-list"),
-  discordMembersSidebar: document.getElementById("discord-members-sidebar"),
-  discordMyUsername: document.getElementById("discord-my-username"),
-  discordMyStatus: document.getElementById("discord-my-status"),
+  savedPublicRoomsContainer: document.getElementById("saved-public-rooms-container"),
+  savedRoomsCountBadge: document.getElementById("saved-rooms-count-badge"),
   modalProfileCard: document.getElementById("modal-profile-card"),
   profileCardBanner: document.getElementById("profile-card-banner"),
   profileCardHandle: document.getElementById("profile-card-handle"),
@@ -118,16 +91,17 @@ export const displays = {
   modalEditProfile: document.getElementById("modal-edit-profile"),
   modalSettingsFullscreen: document.getElementById("modal-settings-fullscreen"),
   roomCode: document.getElementById("room-code-display"),
+  roomTypeBadgeWaiting: document.getElementById("room-type-badge-waiting"),
   chatRoomCode: document.getElementById("chat-room-code"),
+  chatHeaderRoomType: document.getElementById("chat-header-room-type"),
   messagesList: document.getElementById("messages-list"),
   messagesContainer: document.getElementById("messages-container"),
   overlayDisconnected: document.getElementById("overlay-disconnected"),
+  overlaySubtitleDesc: document.getElementById("overlay-subtitle-desc"),
   toast: document.getElementById("toast"),
   typingIndicator: document.getElementById("typing-indicator"),
   landingUsernameLabel: document.getElementById("landing-username-label"),
   chatHeaderUsername: document.getElementById("chat-header-username"),
-  popoverSaved: document.getElementById("popover-saved"),
-  savedVaultList: document.getElementById("saved-vault-list"),
   lightboxModal: document.getElementById("lightbox-modal"),
   lightboxImg: document.getElementById("lightbox-img")
 };
@@ -194,6 +168,31 @@ export function openProfileCardModal(username, isMe = true, onEditClick = null) 
   displays.modalProfileCard.classList.remove("hidden");
 }
 
+export function renderSavedPublicRooms(rooms, onJoinRoom) {
+  displays.savedPublicRoomsContainer.innerHTML = "";
+  displays.savedRoomsCountBadge.textContent = `${rooms.length} Room${rooms.length === 1 ? '' : 's'}`;
+
+  if (!rooms || rooms.length === 0) {
+    displays.savedPublicRoomsContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:0.8rem;">No saved public rooms yet. Create or join a public room code!</div>`;
+    return;
+  }
+
+  rooms.forEach((room) => {
+    const card = document.createElement("div");
+    card.className = "saved-room-card";
+    card.innerHTML = `
+      <div class="saved-room-info">
+        <span class="saved-room-code-tag">${room.code} — ${room.name}</span>
+        <span class="saved-room-sub">${room.topic} • Last active ${room.lastVisitedAt}</span>
+      </div>
+      <button class="btn btn-primary btn-join-saved-room" style="height:32px; font-size:0.75rem; padding:0 10px;">Enter Room</button>
+    `;
+
+    card.querySelector(".btn-join-saved-room").onclick = () => onJoinRoom(room.code);
+    displays.savedPublicRoomsContainer.appendChild(card);
+  });
+}
+
 export function renderFriendsList(friends, onRemove, onStartPrivateChat) {
   displays.friendsListContainer.innerHTML = "";
   if (!friends || friends.length === 0) {
@@ -241,74 +240,6 @@ export function renderInviteFriendsList(friends, onInvite) {
 
     card.querySelector(".btn-invite-user").onclick = () => onInvite(handle);
     displays.inviteFriendsListContainer.appendChild(card);
-  });
-}
-
-export function renderPublicRoomsExplorer(onJoinChannel) {
-  displays.publicRoomsExplorerList.innerHTML = "";
-  displays.publicChannelsListPreview.innerHTML = "";
-
-  publicRooms.forEach((room) => {
-    const card = document.createElement("div");
-    card.className = "explorer-room-card";
-    card.innerHTML = `
-      <div class="explorer-info">
-        <span class="explorer-title">${room.name}</span>
-        <span class="explorer-sub">${room.topic}</span>
-      </div>
-      <button class="btn btn-primary btn-join-pub" style="height:34px; font-size:0.8rem; padding:0 12px;">Join Channel</button>
-    `;
-    card.querySelector(".btn-join-pub").onclick = () => onJoinChannel(room);
-    displays.publicRoomsExplorerList.appendChild(card);
-
-    const prevBtn = document.createElement("div");
-    prevBtn.className = "channel-preview-btn";
-    prevBtn.innerHTML = `
-      <span>${room.name}</span>
-      <span style="font-size:0.72rem; color:var(--text-dim);">Public</span>
-    `;
-    prevBtn.onclick = () => onJoinChannel(room);
-    displays.publicChannelsListPreview.appendChild(prevBtn);
-  });
-}
-
-export function renderDiscordChannelsList(activeChannelId, onSelectChannel) {
-  displays.discordChannelsList.innerHTML = "";
-
-  publicRooms.forEach((room) => {
-    const item = document.createElement("div");
-    item.className = `channel-item ${room.id === activeChannelId ? "active" : ""}`;
-    item.innerHTML = `
-      <span class="channel-item-hash">#</span>
-      <span>${room.name.replace('#', '')}</span>
-    `;
-    item.onclick = () => onSelectChannel(room);
-    displays.discordChannelsList.appendChild(item);
-  });
-}
-
-export function renderDiscordMembers(myUsername, friends, onMemberClick = null) {
-  displays.discordMembersList.innerHTML = "";
-  
-  // Render ONLY actual users (myUsername + actual added friends in network)
-  const actualUsers = Array.from(new Set([myUsername, ...(friends || [])])).filter(Boolean);
-
-  if (actualUsers.length === 0) {
-    displays.discordMembersList.innerHTML = `<div style="padding:12px; font-size:0.75rem; color:var(--text-dim); text-align:center;">No active members online</div>`;
-    return;
-  }
-
-  actualUsers.forEach((name) => {
-    const item = document.createElement("div");
-    item.className = "member-item";
-    item.innerHTML = `
-      <div class="user-status-avatar" style="width:24px; height:24px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </div>
-      <span style="font-size:0.82rem; color:${name === myUsername ? '#60a5fa' : 'var(--text)'}">${name} ${name === myUsername ? '(You)' : ''}</span>
-    `;
-    if (onMemberClick) item.onclick = () => onMemberClick(name);
-    displays.discordMembersList.appendChild(item);
   });
 }
 
