@@ -21,6 +21,7 @@ export function generateRoomCode() {
 const globalChannel = new BroadcastChannel("connect_room_registry");
 const localRooms = new Map();
 const localRoomListeners = new Map();
+const pollingIntervals = new Map();
 
 function notifyRoomListeners(roomCode, roomData) {
   const listeners = localRoomListeners.get(roomCode);
@@ -177,6 +178,53 @@ export async function joinRoom(roomCode, uid) {
   return room;
 }
 
+function stopPolling(roomCode) {
+  const id = pollingIntervals.get(roomCode);
+  if (id) {
+    clearInterval(id);
+    pollingIntervals.delete(roomCode);
+  }
+}
+
+// Cross-device Firestore polling fallback:
+// When Firebase IS configured but onSnapshot fails (network/cold-start),
+// or as an extra safety net, poll Firestore every 2s to detect joins.
+function startFirestorePolling(roomCode, onUpdate) {
+  if (!isConfigured) return;
+  stopPolling(roomCode);
+
+  const intervalId = setInterval(async () => {
+    try {
+      const roomRef = doc(db, "rooms", roomCode);
+      const snap = await withTimeout(getDoc(roomRef), 2000);
+      if (snap.exists()) {
+        const data = snap.data();
+        const current = localRooms.get(roomCode);
+
+        // Detect if members changed or status changed
+        const currentMemberCount = current?.members?.length || 0;
+        const remoteMemberCount = data.members?.length || 0;
+        const statusChanged = current?.status !== data.status;
+
+        if (remoteMemberCount > currentMemberCount || statusChanged) {
+          localRooms.set(roomCode, data);
+          localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(data));
+          onUpdate(data);
+
+          // If room became active (someone joined), stop polling
+          if (data.status === "active" && remoteMemberCount >= 2) {
+            stopPolling(roomCode);
+          }
+        }
+      }
+    } catch (err) {
+      // Silently continue polling
+    }
+  }, 2000);
+
+  pollingIntervals.set(roomCode, intervalId);
+}
+
 export function listenToRoom(roomCode, onUpdate) {
   if (!localRoomListeners.has(roomCode)) {
     localRoomListeners.set(roomCode, new Set());
@@ -206,12 +254,21 @@ export function listenToRoom(roomCode, onUpdate) {
           localRooms.set(roomCode, data);
           localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(data));
           onUpdate(data);
+
+          // Stop polling once onSnapshot is delivering updates
+          if (data.status === "active" && data.members?.length >= 2) {
+            stopPolling(roomCode);
+          }
         }
       });
     } catch (err) {}
+
+    // Start polling as a safety net alongside onSnapshot
+    startFirestorePolling(roomCode, onUpdate);
   }
 
   return () => {
+    stopPolling(roomCode);
     if (unsubFirestore) unsubFirestore();
     const listeners = localRoomListeners.get(roomCode);
     if (listeners) {
@@ -220,3 +277,4 @@ export function listenToRoom(roomCode, onUpdate) {
     }
   };
 }
+
