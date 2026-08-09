@@ -2,6 +2,9 @@ import { db, isConfigured, withTimeout } from "./firebase";
 import { 
   collection, 
   addDoc, 
+  doc,
+  setDoc,
+  getDoc,
   query, 
   orderBy, 
   onSnapshot, 
@@ -14,8 +17,11 @@ const typingUsers = new Map(); // uid -> { isTyping, textLength }
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
 
-// Persistent Device Session & System Memory (3 Days Inactivity Expiry Threshold)
-const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000; // 3 Days
+// Persistent Device Session (3 Days Inactivity Expiry Threshold)
+const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
+
+// Maximum File Size Limit: 1 Terabyte (1 TB / 1,000 GB)
+export const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
 
 let currentUsername = localStorage.getItem("connect_username") || "";
 let currentPassword = localStorage.getItem("connect_password") || "";
@@ -24,8 +30,60 @@ let isVaultEnabled = localStorage.getItem("connect_vault_enabled") !== "false";
 let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
 let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_timestamp") || "0", 10);
 let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
+let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '["@alex", "@dev_master"]');
 
 let peerVaultDisabled = false;
+
+// Default Public Rooms / Channels
+export const PUBLIC_ROOMS = [
+  { id: "pub_general", name: "#general", topic: "General discussion & community lounge", membersCount: 142 },
+  { id: "pub_tech", name: "#tech-lounge", topic: "Technology, AI, & software engineering", membersCount: 89 },
+  { id: "pub_gaming", name: "#gaming", topic: "Gaming, esports, & streaming", membersCount: 64 },
+  { id: "pub_music", name: "#music-beats", topic: "Music, playlists, & audio production", membersCount: 51 },
+  { id: "pub_announcements", name: "#announcements", topic: "Official Connect updates & news", membersCount: 310 }
+];
+
+// Unique Username Registry (LocalStorage & Firestore)
+let registeredUsernames = JSON.parse(localStorage.getItem("connect_registered_usernames") || '{"@sarvan": "uid_owner", "@alex": "uid_alex", "@dev_master": "uid_dev"}');
+
+export function isUsernameTaken(username, currentUid = null) {
+  const norm = username.trim().toLowerCase();
+  const handle = norm.startsWith("@") ? norm : `@${norm}`;
+
+  if (registeredUsernames[handle] && registeredUsernames[handle] !== currentUid) {
+    return true;
+  }
+  return false;
+}
+
+export async function claimUniqueUsername(username, uid) {
+  const norm = username.trim().toLowerCase();
+  const handle = norm.startsWith("@") ? norm : `@${norm}`;
+
+  if (isUsernameTaken(handle, uid)) {
+    throw new Error(`Username ${handle} is already claimed by another user. Please choose a different handle.`);
+  }
+
+  // Claim locally
+  registeredUsernames[handle] = uid;
+  localStorage.setItem("connect_registered_usernames", JSON.stringify(registeredUsernames));
+
+  // Claim in Firestore if configured
+  if (isConfigured) {
+    try {
+      const userRef = doc(db, "usernames", handle);
+      const snap = await withTimeout(getDoc(userRef), 1500);
+      if (snap.exists() && snap.data().uid !== uid) {
+        throw new Error(`Username ${handle} is already claimed in the global network.`);
+      }
+      await withTimeout(setDoc(userRef, { uid, claimedAt: serverTimestamp() }), 1500);
+    } catch (err) {
+      if (err.message && err.message.includes("already claimed")) throw err;
+    }
+  }
+
+  return handle;
+}
 
 export function hasCompletedSetup() {
   return isSetupCompleted && currentUsername.trim().length > 0;
@@ -47,8 +105,16 @@ export function touchSession() {
   }
 }
 
-export function saveUserSettings(name, password, soundOn = true, vaultOn = true) {
-  currentUsername = name.trim() || "Anonymous";
+export function saveUserSettings(name, password, soundOn = true, vaultOn = true, uid = "local_uid") {
+  const handle = name.trim().startsWith("@") ? name.trim() : `@${name.trim()}`;
+  
+  if (isUsernameTaken(handle, uid)) {
+    throw new Error(`Username ${handle} is already claimed by another user.`);
+  }
+
+  claimUniqueUsername(handle, uid);
+
+  currentUsername = handle;
   currentPassword = password.trim();
   isSoundEnabled = soundOn;
   isVaultEnabled = vaultOn;
@@ -73,7 +139,7 @@ export function saveUserSettings(name, password, soundOn = true, vaultOn = true)
 }
 
 export function getUsername() {
-  return currentUsername || "Anonymous";
+  return currentUsername || "@anonymous";
 }
 
 export function getPassword() {
@@ -121,6 +187,49 @@ export function removeSavedMessageFromVault(msgId) {
   return savedVaultMessages;
 }
 
+// Friends System
+export function getFriends() {
+  return friendsList;
+}
+
+export function addFriend(friendHandle) {
+  const norm = friendHandle.trim().toLowerCase();
+  const handle = norm.startsWith("@") ? norm : `@${norm}`;
+
+  if (handle === getUsername().toLowerCase()) {
+    throw new Error("You cannot add yourself as a friend.");
+  }
+
+  if (friendsList.includes(handle)) {
+    throw new Error(`${handle} is already in your friends list.`);
+  }
+
+  friendsList.push(handle);
+  localStorage.setItem("connect_friends_list", JSON.stringify(friendsList));
+
+  // Auto-register friend handle in local registry if missing
+  if (!registeredUsernames[handle]) {
+    registeredUsernames[handle] = `uid_${handle.replace('@', '')}`;
+    localStorage.setItem("connect_registered_usernames", JSON.stringify(registeredUsernames));
+  }
+
+  return friendsList;
+}
+
+export function removeFriend(friendHandle) {
+  friendsList = friendsList.filter((f) => f.toLowerCase() !== friendHandle.toLowerCase());
+  localStorage.setItem("connect_friends_list", JSON.stringify(friendsList));
+  return friendsList;
+}
+
+export function formatFileSize(bytes) {
+  if (!bytes) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
 export function sendTypingIndicator(roomCode, uid, isTyping, textLength = 0) {
   if (roomChannel) {
     roomChannel.postMessage({
@@ -157,15 +266,15 @@ export async function sendMessage(roomCode, uid, payload) {
   const effectMode = typeof payload === "object" ? payload.effectMode || "normal" : "normal";
   const fileName = typeof payload === "object" ? payload.fileName || null : null;
   const fileSize = typeof payload === "object" ? payload.fileSize || null : null;
+  const fileSizeBytes = typeof payload === "object" ? payload.fileSizeBytes || null : null;
   const soundFx = typeof payload === "object" ? payload.soundFx || null : null;
   const vaultMemoryOrigin = typeof payload === "object" ? payload.vaultMemoryOrigin || null : null;
   const senderName = getUsername();
 
   if (!text.trim() && !mediaUrl && !soundFx) return;
 
-  touchSession(); // Touch active session on sending message
+  touchSession();
 
-  // Clear local typing status once message is sent
   sendTypingIndicator(roomCode, uid, false, 0);
 
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -181,7 +290,8 @@ export async function sendMessage(roomCode, uid, payload) {
     replyTo,
     effectMode,
     fileName,
-    fileSize,
+    fileSize: fileSize || (fileSizeBytes ? formatFileSize(fileSizeBytes) : null),
+    fileSizeBytes,
     soundFx,
     vaultMemoryOrigin,
     reactions: {},
@@ -190,11 +300,9 @@ export async function sendMessage(roomCode, uid, payload) {
     isNew: true
   };
 
-  // 1. Instantly store locally & trigger synchronous UI render for sender!
   messageStore.set(msgObj.id, msgObj);
   notifyMessages();
 
-  // 2. Broadcast to other tabs instantly
   if (roomChannel) {
     roomChannel.postMessage({
       type: "CHAT_MESSAGE",
@@ -203,7 +311,6 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
-  // 3. Try Firestore in background if configured
   if (isConfigured) {
     withTimeout(addDoc(collection(db, "rooms", roomCode, "messages"), {
       sender: uid,
@@ -214,7 +321,8 @@ export async function sendMessage(roomCode, uid, payload) {
       replyTo,
       effectMode,
       fileName,
-      fileSize,
+      fileSize: fileSize || (fileSizeBytes ? formatFileSize(fileSizeBytes) : null),
+      fileSizeBytes,
       soundFx,
       vaultMemoryOrigin,
       reactions: {},
@@ -273,7 +381,6 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   }
   roomChannel = new BroadcastChannel(`connect_chat_${roomCode}`);
 
-  // Broadcast initial settings state
   roomChannel.postMessage({
     type: "ROOM_SETTINGS_UPDATE",
     vaultDisabled: !isVaultEnabled
@@ -335,7 +442,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
               messageStore.set(id, {
                 id,
                 sender: data.sender,
-                senderName: data.senderName || "Anonymous",
+                senderName: data.senderName || "@anonymous",
                 text: data.text || "",
                 mediaType: data.mediaType || "text",
                 mediaUrl: data.mediaUrl || null,
@@ -343,6 +450,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
                 effectMode: data.effectMode || "normal",
                 fileName: data.fileName || null,
                 fileSize: data.fileSize || null,
+                fileSizeBytes: data.fileSizeBytes || null,
                 soundFx: data.soundFx || null,
                 vaultMemoryOrigin: data.vaultMemoryOrigin || null,
                 reactions: data.reactions || {},

@@ -7,40 +7,25 @@ import {
 } from "./room";
 import { 
   sendMessage, 
-  deleteMessage,
   listenToMessages, 
-  toggleReaction, 
-  sendTypingIndicator, 
-  listenToTyping,
-  hasCompletedSetup,
   hasValidSession,
   touchSession,
   saveUserSettings,
   getUsername,
   getPassword,
-  getSoundEnabled,
-  getVaultEnabled,
-  isSelfVaultDisabled,
-  getSavedVaultMessages,
-  saveMessageToVault,
-  removeSavedMessageFromVault
+  getFriends,
+  addFriend,
+  removeFriend,
+  PUBLIC_ROOMS,
+  MAX_FILE_SIZE_BYTES,
+  formatFileSize
 } from "./chat";
 import { 
   destroyRoomSession, 
   registerUnloadCleanup, 
   unregisterUnloadCleanup 
 } from "./cleanup";
-import { 
-  processImageFile, 
-  VoiceRecorder 
-} from "./media";
-import { soundEngine } from "./sound";
-import { 
-  addNotification, 
-  markAllAsRead, 
-  clearNotifications, 
-  listenToNotifications 
-} from "./notifications";
+import { processImageFile } from "./media";
 import { 
   views, 
   buttons, 
@@ -51,17 +36,11 @@ import {
   showOverlayDisconnected, 
   hideOverlayDisconnected, 
   renderMessages,
-  renderSavedVault,
-  renderNotifications,
-  initMediaPopovers,
-  initEmojiPanel,
-  initDoodleStudio,
-  triggerConfettiEffect,
-  showReplyPreview,
-  hideReplyPreview,
-  closeLightbox,
-  showWipModal,
-  hideWipModal
+  renderFriendsList,
+  renderPublicRoomsExplorer,
+  renderDiscordChannelsList,
+  renderDiscordMembers,
+  closeLightbox
 } from "./ui";
 import { initThreeShowcase } from "./showcase3d";
 
@@ -69,14 +48,10 @@ let currentRoomCode = null;
 let currentUid = null;
 let roomUnsubscribe = null;
 let chatUnsubscribe = null;
-let typingUnsubscribe = null;
+let publicChatUnsubscribe = null;
 
-let currentReplyMessage = null;
-let selectedContextMenuMessage = null;
-let voiceRecorder = null;
-let voiceTimerInterval = null;
-let voiceStartTime = 0;
-let currentAuthMode = "signup"; // 'signup' | 'login'
+let activePublicChannel = PUBLIC_ROOMS[0];
+let currentAuthMode = "signup";
 
 async function init() {
   setupEventListeners();
@@ -87,26 +62,21 @@ async function init() {
     currentUid = getUserUid();
   }
 
-  // Initialize Three.js 3D Background Canvas
+  // Initialize Three.js 3D Canvas
   if (displays.threeBgCanvas) {
     initThreeShowcase(displays.threeBgCanvas);
   }
 
-  // Always show Showcase Product Landing Page first
+  // Showcase view first
   showView("showcase");
 
-  // Touch active session if valid
   if (hasValidSession()) {
     touchSession();
   }
 
-  initMediaPopovers(handleSendGif, handleSendSticker);
-  initEmojiPanel(handleSelectEmoji);
-  initDoodleStudio(handleSendDoodle);
-  
-  listenToNotifications((notifs, unread) => {
-    renderNotifications(notifs, unread);
-  });
+  // Initial Public Rooms & Friends List render
+  updateFriendsUI();
+  updatePublicRoomsUI();
 }
 
 function enterConnectApp() {
@@ -134,22 +104,22 @@ function updateAuthModalUI() {
   if (currentAuthMode === "signup") {
     buttons.authTabSignup.classList.add("active");
     buttons.authTabLogin.classList.remove("active");
-    displays.authModalTitle.textContent = "Sign Up & Enter Connect";
-    displays.authModalDesc.textContent = "Set your handle & passcode to enter private room sessions.";
+    displays.authModalTitle.textContent = "Sign Up & Claim Unique Handle";
+    displays.authModalDesc.textContent = "Your handle is globally locked to your account and cannot be stolen.";
     displays.authSignupOptions.style.display = "block";
-    displays.authSubmitText.textContent = "Sign Up & Enter App";
+    displays.authSubmitText.textContent = "Claim Handle & Enter App";
 
-    inputs.authUsername.value = getUsername() !== "Anonymous" ? getUsername() : "";
+    inputs.authUsername.value = getUsername() !== "@anonymous" ? getUsername() : "";
     inputs.authPassword.value = getPassword() || "";
   } else {
     buttons.authTabLogin.classList.add("active");
     buttons.authTabSignup.classList.remove("active");
     displays.authModalTitle.textContent = "Log In to Connect";
-    displays.authModalDesc.textContent = "Enter your username & PIN code to resume session.";
+    displays.authModalDesc.textContent = "Enter your unique handle & PIN passcode to resume session.";
     displays.authSignupOptions.style.display = "none";
     displays.authSubmitText.textContent = "Log In & Enter App";
 
-    inputs.authUsername.value = getUsername() !== "Anonymous" ? getUsername() : "";
+    inputs.authUsername.value = getUsername() !== "@anonymous" ? getUsername() : "";
     inputs.authPassword.value = getPassword() || "";
   }
 }
@@ -169,81 +139,75 @@ function handleAuthSubmit() {
     return;
   }
 
-  saveUserSettings(uname, pwd, soundOn, vaultOn);
-  updateProfileUI();
-  closeAuthModal();
+  try {
+    saveUserSettings(uname, pwd, soundOn, vaultOn, currentUid);
+    updateProfileUI();
+    closeAuthModal();
 
-  showToast(`Authenticated as @${uname}. Welcome!`);
-  showView("landing");
+    showToast(`Authenticated as ${getUsername()}. Welcome!`);
+    showView("landing");
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 function updateProfileUI() {
   const uname = getUsername();
   const pwd = getPassword();
-  const soundOn = getSoundEnabled();
-  const vaultOn = !isSelfVaultDisabled();
 
   inputs.settingUsername.value = uname;
   inputs.settingPassword.value = pwd;
-  inputs.settingToggleSound.checked = soundOn;
-  inputs.settingToggleVault.checked = vaultOn;
 
-  displays.landingUsernameLabel.textContent = `@${uname}`;
+  displays.landingUsernameLabel.textContent = uname;
   displays.chatHeaderUsername.textContent = uname;
+  displays.discordMyUsername.textContent = uname;
 }
 
-function openFullscreenSettings() {
-  updateProfileUI();
-  displays.modalSettingsFullscreen.classList.remove("hidden");
+function updateFriendsUI() {
+  const friends = getFriends();
+  renderFriendsList(
+    friends,
+    (friendHandle) => {
+      removeFriend(friendHandle);
+      updateFriendsUI();
+      showToast(`Removed ${friendHandle} from friends.`);
+    },
+    (friendHandle) => {
+      displays.modalFriendsList.classList.add("hidden");
+      handleCreateRoom(); // Start private room session with friend
+      showToast(`Starting private room for ${friendHandle}...`);
+    }
+  );
 }
 
-function closeFullscreenSettings() {
-  displays.modalSettingsFullscreen.classList.add("hidden");
+function updatePublicRoomsUI() {
+  renderPublicRoomsExplorer((channel) => {
+    displays.modalPublicRooms.classList.add("hidden");
+    openPublicWorkspace(channel);
+  });
 }
 
-function handleSaveSettings() {
-  const uname = inputs.settingUsername.value.trim();
-  const pwd = inputs.settingPassword.value.trim();
-  const soundOn = inputs.settingToggleSound.checked;
-  const vaultOn = inputs.settingToggleVault.checked;
+function openPublicWorkspace(channel = PUBLIC_ROOMS[0]) {
+  activePublicChannel = channel;
+  displays.discordChannelName.textContent = channel.name.replace('#', '');
+  displays.discordChannelTopic.textContent = channel.topic;
+  inputs.discordMessage.placeholder = `Message ${channel.name}... (1 TB max attachment)`;
 
-  if (!uname) {
-    showToast("Please enter a valid username");
-    return;
-  }
-
-  saveUserSettings(uname, pwd, soundOn, vaultOn);
-  updateProfileUI();
-  closeFullscreenSettings();
-  showToast("Settings applied & saved");
-}
-
-function handleSendFromVault(vaultMsg) {
-  if (!getVaultEnabled()) {
-    showToast("Vault Memory is disabled for this session.");
-    return;
-  }
-  if (!currentRoomCode) {
-    showToast("Join or create a room to send Vault items");
-    return;
-  }
-
-  displays.popoverSaved.classList.add("hidden");
-  
-  sendMessage(currentRoomCode, currentUid, {
-    text: vaultMsg.text || "",
-    mediaType: vaultMsg.mediaType || "text",
-    mediaUrl: vaultMsg.mediaUrl || null,
-    fileName: vaultMsg.fileName || null,
-    fileSize: vaultMsg.fileSize || null,
-    vaultMemoryOrigin: vaultMsg.vaultSavedAt || vaultMsg.localTime || "Past Session"
+  renderDiscordChannelsList(channel.id, (selectedChan) => {
+    openPublicWorkspace(selectedChan);
   });
 
-  showToast("Vault Archive Memory dropped into chat");
+  renderDiscordMembers(getUsername(), getFriends());
+  showView("publicWorkspace");
+
+  if (publicChatUnsubscribe) publicChatUnsubscribe();
+  publicChatUnsubscribe = listenToMessages(channel.id, currentUid, (messages) => {
+    renderMessages(messages, currentUid, displays.discordMessagesList);
+  });
 }
 
 function setupEventListeners() {
-  // Landing Page Log In & Sign Up Controls
+  // Navigation & Landing Page Auth
   buttons.navLogin.addEventListener("click", () => {
     if (hasValidSession()) enterConnectApp();
     else openAuthModal("login");
@@ -298,49 +262,69 @@ function setupEventListeners() {
   });
   buttons.submitAuth.addEventListener("click", handleAuthSubmit);
 
-  // Showcase Interactive Tour Sandbox Demos
-  buttons.sandboxSound.addEventListener("click", () => {
-    soundEngine.playSoundFX("airhorn");
-    displays.sandboxPreviewOutput.innerHTML = `
-      <div style="color: #60a5fa; font-weight: 600; text-align: center;">
-        🔊 Airhorn Sound FX played synchronously across session!
-      </div>
-    `;
+  // Friends List Drawer Handlers
+  buttons.friendsDrawer.addEventListener("click", () => {
+    updateFriendsUI();
+    displays.modalFriendsList.classList.remove("hidden");
   });
 
-  buttons.sandboxVault.addEventListener("click", () => {
-    const timeStr = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-    displays.sandboxPreviewOutput.innerHTML = `
-      <div class="msg-vault-archive-box" style="width:100%; margin:0;">
-        <div class="msg-vault-archive-header">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          <span>Vault Archive Memory</span>
-        </div>
-        <div class="msg-vault-archive-desc">Retrieved from Vault Memory saved on ${timeStr}</div>
-        <div style="margin-top:4px; font-size:0.85rem; color:#ffffff;">"This item was selectively archived across sessions."</div>
-      </div>
-    `;
+  buttons.closeFriendsModal.addEventListener("click", () => {
+    displays.modalFriendsList.classList.add("hidden");
   });
 
-  buttons.sandboxConfetti.addEventListener("click", () => {
-    triggerConfettiEffect();
-    displays.sandboxPreviewOutput.innerHTML = `
-      <div style="color: #ec4899; font-weight: 600; text-align: center;">
-        🎉 Confetti Burst effect triggered!
-      </div>
-    `;
+  buttons.addFriendSubmit.addEventListener("click", () => {
+    const handle = inputs.addFriendHandle.value.trim();
+    if (!handle) {
+      showToast("Please enter a username or handle");
+      return;
+    }
+    try {
+      addFriend(handle);
+      inputs.addFriendHandle.value = "";
+      updateFriendsUI();
+      showToast(`Added ${handle} to your friends list!`);
+    } catch (err) {
+      showToast(err.message);
+    }
   });
 
-  // Top-Right Corner Settings Gear Buttons
-  buttons.gearLanding.addEventListener("click", openFullscreenSettings);
-  buttons.gearChat.addEventListener("click", openFullscreenSettings);
-  buttons.profileLanding.addEventListener("click", openFullscreenSettings);
-  buttons.profileHeader.addEventListener("click", openFullscreenSettings);
+  // Public Rooms Explorer Handlers
+  buttons.publicExplorer.addEventListener("click", () => {
+    updatePublicRoomsUI();
+    displays.modalPublicRooms.classList.remove("hidden");
+  });
 
-  buttons.closeFullscreenSettings.addEventListener("click", closeFullscreenSettings);
-  buttons.saveFullscreenSettings.addEventListener("click", handleSaveSettings);
+  buttons.browsePublicChannels.addEventListener("click", () => {
+    updatePublicRoomsUI();
+    displays.modalPublicRooms.classList.remove("hidden");
+  });
 
-  // Navigation & Rooms
+  buttons.closePublicModal.addEventListener("click", () => {
+    displays.modalPublicRooms.classList.add("hidden");
+  });
+
+  buttons.leavePublicWorkspace.addEventListener("click", () => {
+    if (publicChatUnsubscribe) {
+      publicChatUnsubscribe();
+      publicChatUnsubscribe = null;
+    }
+    showView("landing");
+  });
+
+  buttons.toggleMembersSidebar.addEventListener("click", () => {
+    displays.discordMembersSidebar.classList.toggle("open");
+  });
+
+  // Discord Public Workspace Input Handlers
+  buttons.discordSend.addEventListener("click", handleSendDiscordMessage);
+  inputs.discordMessage.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSendDiscordMessage();
+    }
+  });
+
+  // Private Rooms Creation & Joining
   buttons.create.addEventListener("click", handleCreateRoom);
   buttons.join.addEventListener("click", handleJoinRoom);
 
@@ -363,70 +347,15 @@ function setupEventListeners() {
   buttons.endSession.addEventListener("click", handleEndSession);
   buttons.returnHome.addEventListener("click", handleReturnHome);
 
-  // Saved History Vault Handlers
-  buttons.toggleSaved.addEventListener("click", () => {
-    closeAllPopovers();
-    const vault = getSavedVaultMessages();
-    const vaultDisabled = !getVaultEnabled();
-    renderSavedVault(
-      vault,
-      (msgId) => {
-        const updated = removeSavedMessageFromVault(msgId);
-        renderSavedVault(updated, (id) => removeSavedMessageFromVault(id), handleSendFromVault, vaultDisabled);
-        showToast("Removed from Vault");
-      },
-      handleSendFromVault,
-      vaultDisabled
-    );
-    displays.popoverSaved.classList.toggle("hidden");
-  });
+  // Settings Gear
+  buttons.gearLanding.addEventListener("click", openFullscreenSettings);
+  buttons.gearChat.addEventListener("click", openFullscreenSettings);
+  buttons.profileLanding.addEventListener("click", openFullscreenSettings);
+  buttons.profileHeader.addEventListener("click", openFullscreenSettings);
+  buttons.closeFullscreenSettings.addEventListener("click", closeFullscreenSettings);
+  buttons.saveFullscreenSettings.addEventListener("click", handleSaveSettings);
 
-  buttons.closeSaved.addEventListener("click", () => {
-    displays.popoverSaved.classList.add("hidden");
-  });
-
-  // Context Menu Modal Handlers
-  buttons.closeContext.addEventListener("click", () => {
-    displays.contextMenuModal.classList.add("hidden");
-  });
-
-  buttons.contextReply.addEventListener("click", () => {
-    if (selectedContextMenuMessage) {
-      handleReplyClick(selectedContextMenuMessage);
-      displays.contextMenuModal.classList.add("hidden");
-    }
-  });
-
-  buttons.contextSave.addEventListener("click", () => {
-    if (selectedContextMenuMessage) {
-      try {
-        saveMessageToVault(selectedContextMenuMessage);
-        displays.contextMenuModal.classList.add("hidden");
-        showToast("Saved to Vault Memory");
-      } catch (err) {
-        showToast(err.message);
-      }
-    }
-  });
-
-  buttons.contextCopy.addEventListener("click", () => {
-    if (selectedContextMenuMessage) {
-      const copyVal = selectedContextMenuMessage.text || selectedContextMenuMessage.mediaUrl || "";
-      navigator.clipboard.writeText(copyVal);
-      displays.contextMenuModal.classList.add("hidden");
-      showToast("Copied to clipboard");
-    }
-  });
-
-  buttons.contextDelete.addEventListener("click", () => {
-    if (selectedContextMenuMessage && currentRoomCode) {
-      deleteMessage(currentRoomCode, selectedContextMenuMessage.id);
-      displays.contextMenuModal.classList.add("hidden");
-      showToast("Message deleted for all");
-    }
-  });
-
-  // Chat Input & Continuous Unsent Draft Typing Broadcast
+  // Private Chat Send
   buttons.send.addEventListener("click", handleSendMessage);
   inputs.message.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -435,152 +364,127 @@ function setupEventListeners() {
     }
   });
 
-  inputs.message.addEventListener("input", handleTypingEvent);
+  // 1 Terabyte (1 TB) File Upload Handlers (Private & Public Chat)
+  inputs.fileUpload.addEventListener("change", (e) => handleFileUpload(e, currentRoomCode));
+  inputs.pubFileUpload.addEventListener("change", (e) => handleFileUpload(e, activePublicChannel?.id));
 
-  // Media Attachments
-  inputs.photoUpload.addEventListener("change", handlePhotoUpload);
-  inputs.fileUpload.addEventListener("change", handleFileUpload);
-
-  // Emojis Popover Toggle
-  buttons.toggleEmojis.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverEmojis.classList.toggle("hidden");
-  });
-
-  buttons.closeEmojis.addEventListener("click", () => {
-    displays.popoverEmojis.classList.add("hidden");
-  });
-
-  // GIFs Popover Toggle
-  buttons.toggleGifs.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverGifs.classList.toggle("hidden");
-  });
-
-  buttons.closeGifs.addEventListener("click", () => {
-    displays.popoverGifs.classList.add("hidden");
-  });
-
-  // Stickers Popover Toggle
-  buttons.toggleStickers.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverStickers.classList.toggle("hidden");
-  });
-
-  buttons.closeStickers.addEventListener("click", () => {
-    displays.popoverStickers.classList.add("hidden");
-  });
-
-  // Doodle Canvas Studio Toggle
-  buttons.toggleDraw.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverDraw.classList.toggle("hidden");
-  });
-
-  buttons.closeDraw.addEventListener("click", () => {
-    displays.popoverDraw.classList.add("hidden");
-  });
-
-  // Live Soundboard FX Toggle
-  buttons.toggleSoundboard.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverSoundboard.classList.toggle("hidden");
-  });
-
-  buttons.closeSoundboard.addEventListener("click", () => {
-    displays.popoverSoundboard.classList.add("hidden");
-  });
-
-  document.querySelectorAll(".sound-fx-btn").forEach((btn) => {
-    btn.onclick = async () => {
-      const fx = btn.getAttribute("data-fx");
-      displays.popoverSoundboard.classList.add("hidden");
-      
-      if (currentRoomCode) {
-        await sendMessage(currentRoomCode, currentUid, {
-          text: `🔊 Sound FX: ${btn.textContent}`,
-          mediaType: "sound_fx",
-          soundFx: fx
-        });
-      }
-    };
-  });
-
-  // Notifications Drawer
-  buttons.notifications.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverNotifications.classList.toggle("hidden");
-    markAllAsRead();
-  });
-
-  buttons.clearNotifications.addEventListener("click", () => {
-    clearNotifications();
-  });
-
-  // Calling WIP Modal Handlers
-  buttons.audioCall.addEventListener("click", () => {
-    addNotification("Voice Call", "Feature under construction", "📞");
-    showWipModal();
-  });
-
-  buttons.videoCall.addEventListener("click", () => {
-    addNotification("Video Call", "Feature under construction", "📹");
-    showWipModal();
-  });
-
-  buttons.closeWip.addEventListener("click", hideWipModal);
-  buttons.dismissWip.addEventListener("click", hideWipModal);
-
-  // Voice Recorder
-  buttons.recordVoice.addEventListener("click", handleToggleVoiceRecord);
-  buttons.cancelVoice.addEventListener("click", handleCancelVoiceRecord);
-
-  // Reply Cancel & Lightbox Close
-  buttons.cancelReply.addEventListener("click", () => {
-    currentReplyMessage = null;
-    hideReplyPreview();
-  });
+  inputs.photoUpload.addEventListener("change", (e) => handlePhotoUpload(e, currentRoomCode));
+  inputs.pubPhotoUpload.addEventListener("change", (e) => handlePhotoUpload(e, activePublicChannel?.id));
 
   buttons.closeLightbox.addEventListener("click", closeLightbox);
 }
 
-function closeAllPopovers() {
+function openFullscreenSettings() {
+  updateProfileUI();
+  displays.modalSettingsFullscreen.classList.remove("hidden");
+}
+
+function closeFullscreenSettings() {
   displays.modalSettingsFullscreen.classList.add("hidden");
-  displays.popoverSaved.classList.add("hidden");
-  displays.popoverEmojis.classList.add("hidden");
-  displays.popoverGifs.classList.add("hidden");
-  displays.popoverStickers.classList.add("hidden");
-  displays.popoverDraw.classList.add("hidden");
-  displays.popoverSoundboard.classList.add("hidden");
-  displays.popoverNotifications.classList.add("hidden");
 }
 
-function handleSelectEmoji(char) {
-  const input = inputs.message;
-  const start = input.selectionStart || input.value.length;
-  const end = input.selectionEnd || input.value.length;
+function handleSaveSettings() {
+  const uname = inputs.settingUsername.value.trim();
+  const pwd = inputs.settingPassword.value.trim();
 
-  input.value = input.value.substring(0, start) + char + input.value.substring(end);
-  input.selectionStart = input.selectionEnd = start + char.length;
-  input.focus();
-  handleTypingEvent();
-}
+  if (!uname) {
+    showToast("Please enter a valid username");
+    return;
+  }
 
-function handleTypingEvent() {
-  if (!currentRoomCode || !currentUid) return;
-  const textLen = inputs.message.value.trim().length;
-
-  if (textLen > 0) {
-    sendTypingIndicator(currentRoomCode, currentUid, true, textLen);
-  } else {
-    sendTypingIndicator(currentRoomCode, currentUid, false, 0);
+  try {
+    saveUserSettings(uname, pwd, true, true, currentUid);
+    updateProfileUI();
+    closeFullscreenSettings();
+    showToast("Settings applied & saved");
+  } catch (err) {
+    showToast(err.message);
   }
 }
 
-function handleMessageClick(msg) {
-  selectedContextMenuMessage = msg;
-  displays.contextMenuPreview.textContent = msg.text || msg.mediaType || "message";
-  displays.contextMenuModal.classList.remove("hidden");
+async function handleSendDiscordMessage() {
+  const text = inputs.discordMessage.value.trim();
+  if (!text || !activePublicChannel) return;
+
+  inputs.discordMessage.value = "";
+  
+  await sendMessage(activePublicChannel.id, currentUid, {
+    text,
+    mediaType: "text"
+  });
+
+  inputs.discordMessage.focus();
+}
+
+async function handleSendMessage() {
+  const text = inputs.message.value.trim();
+  if (!text || !currentRoomCode) return;
+
+  inputs.message.value = "";
+  
+  await sendMessage(currentRoomCode, currentUid, {
+    text,
+    mediaType: "text"
+  });
+
+  inputs.message.focus();
+}
+
+async function handlePhotoUpload(e, targetRoomId) {
+  const file = e.target.files[0];
+  if (!file || !targetRoomId) return;
+
+  try {
+    showToast("Processing photo...");
+    const dataUrl = await processImageFile(file);
+    
+    await sendMessage(targetRoomId, currentUid, {
+      text: "",
+      mediaType: "image",
+      mediaUrl: dataUrl
+    });
+
+    e.target.value = "";
+  } catch (err) {
+    showToast("Could not send image: " + err.message);
+  }
+}
+
+async function handleFileUpload(e, targetRoomId) {
+  const file = e.target.files[0];
+  if (!file || !targetRoomId) return;
+
+  // Validate File Size against 1 TB Limit (1,099,511,627,776 Bytes)
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    showToast("File exceeds maximum 1 Terabyte (1 TB) size limit.");
+    e.target.value = "";
+    return;
+  }
+
+  try {
+    const formattedSize = formatFileSize(file.size);
+    showToast(`Attaching ${file.name} (${formattedSize})...`);
+    
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result;
+      
+      await sendMessage(targetRoomId, currentUid, {
+        text: file.name,
+        mediaType: "file",
+        mediaUrl: dataUrl,
+        fileName: file.name,
+        fileSize: formattedSize,
+        fileSizeBytes: file.size
+      });
+
+      e.target.value = "";
+      showToast(`Attachment sent (${formattedSize})`);
+    };
+    reader.readAsDataURL(file);
+  } catch (err) {
+    showToast("Could not send file: " + err.message);
+  }
 }
 
 async function handleCreateRoom() {
@@ -643,49 +547,9 @@ function startChatSession() {
   showView("chat");
   setTimeout(() => inputs.message.focus(), 100);
 
-  addNotification("Room Active", `Connected to room ${currentRoomCode}`, "🔒");
-
-  let previousMsgCount = 0;
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
-    if (messages.length > previousMsgCount) {
-      const lastMsg = messages[messages.length - 1];
-
-      // Handle Soundboard FX playback for both sender and recipient
-      if (lastMsg.mediaType === "sound_fx" && lastMsg.soundFx && getSoundEnabled()) {
-        soundEngine.playSoundFX(lastMsg.soundFx);
-      }
-
-      // Handle Confetti effect for both sender and recipient
-      if (lastMsg.effectMode === "confetti") {
-        triggerConfettiEffect();
-      }
-
-      // Handle Notifications & Chimes
-      if (previousMsgCount > 0 && lastMsg.sender !== currentUid) {
-        if (lastMsg.mediaType !== "sound_fx" && getSoundEnabled()) soundEngine.playMessageDing();
-        
-        let notifText = lastMsg.text;
-        if (lastMsg.mediaType === "image") notifText = "Sent a photo";
-        else if (lastMsg.mediaType === "gif") notifText = "Sent a GIF";
-        else if (lastMsg.mediaType === "sticker") notifText = "Sent a sticker";
-        else if (lastMsg.mediaType === "audio") notifText = "Sent a voice note";
-        else if (lastMsg.mediaType === "file") notifText = `Shared file ${lastMsg.fileName || ''}`;
-
-        addNotification("New Message", notifText, "💬");
-      }
-    }
-    previousMsgCount = messages.length;
-    renderMessages(messages, currentUid, handleReactionClick, handleReplyClick, handleMessageClick);
-  });
-
-  if (typingUnsubscribe) typingUnsubscribe();
-  typingUnsubscribe = listenToTyping((users) => {
-    if (users.length > 0) {
-      displays.typingIndicator.classList.remove("hidden");
-    } else {
-      displays.typingIndicator.classList.add("hidden");
-    }
+    renderMessages(messages, currentUid, displays.messagesList);
   });
 
   if (roomUnsubscribe) roomUnsubscribe();
@@ -694,163 +558,6 @@ function startChatSession() {
       onSessionEnded();
     }
   });
-}
-
-// Chat Action Handlers
-async function handleSendMessage() {
-  const text = inputs.message.value.trim();
-  if (!text || !currentRoomCode) return;
-
-  const effectMode = inputs.selectEffectMode.value;
-  inputs.message.value = "";
-  
-  const payload = {
-    text,
-    mediaType: "text",
-    effectMode,
-    replyTo: currentReplyMessage ? { id: currentReplyMessage.id, text: currentReplyMessage.text } : null
-  };
-
-  currentReplyMessage = null;
-  hideReplyPreview();
-
-  await sendMessage(currentRoomCode, currentUid, payload);
-  inputs.message.focus();
-}
-
-async function handlePhotoUpload(e) {
-  const file = e.target.files[0];
-  if (!file || !currentRoomCode) return;
-
-  try {
-    showToast("Processing photo...");
-    const dataUrl = await processImageFile(file);
-    
-    await sendMessage(currentRoomCode, currentUid, {
-      text: "",
-      mediaType: "image",
-      mediaUrl: dataUrl
-    });
-
-    inputs.photoUpload.value = "";
-  } catch (err) {
-    showToast("Could not send image: " + err.message);
-  }
-}
-
-async function handleFileUpload(e) {
-  const file = e.target.files[0];
-  if (!file || !currentRoomCode) return;
-
-  try {
-    showToast("Attaching document...");
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result;
-      const sizeMb = (file.size / 1024 / 1024).toFixed(2);
-      
-      await sendMessage(currentRoomCode, currentUid, {
-        text: file.name,
-        mediaType: "file",
-        mediaUrl: dataUrl,
-        fileName: file.name,
-        fileSize: `${sizeMb} MB`
-      });
-
-      inputs.fileUpload.value = "";
-    };
-    reader.readAsDataURL(file);
-  } catch (err) {
-    showToast("Could not send file: " + err.message);
-  }
-}
-
-async function handleSendDoodle(sketchDataUrl) {
-  if (!currentRoomCode) return;
-  await sendMessage(currentRoomCode, currentUid, {
-    text: "Hand-drawn Sketch",
-    mediaType: "image",
-    mediaUrl: sketchDataUrl
-  });
-}
-
-async function handleSendGif(gifUrl) {
-  if (!currentRoomCode) return;
-  await sendMessage(currentRoomCode, currentUid, {
-    text: "",
-    mediaType: "gif",
-    mediaUrl: gifUrl
-  });
-}
-
-async function handleSendSticker(stickerUrl) {
-  if (!currentRoomCode) return;
-  await sendMessage(currentRoomCode, currentUid, {
-    text: "",
-    mediaType: "sticker",
-    mediaUrl: stickerUrl
-  });
-}
-
-async function handleToggleVoiceRecord() {
-  if (voiceRecorder) {
-    try {
-      clearInterval(voiceTimerInterval);
-      displays.voiceRecordingBar.classList.add("hidden");
-      
-      const audioDataUrl = await voiceRecorder.stop();
-      voiceRecorder = null;
-
-      await sendMessage(currentRoomCode, currentUid, {
-        text: "Voice Note",
-        mediaType: "audio",
-        mediaUrl: audioDataUrl
-      });
-    } catch (err) {
-      showToast("Voice recording failed: " + err.message);
-    }
-  } else {
-    try {
-      voiceRecorder = new VoiceRecorder();
-      await voiceRecorder.start();
-
-      voiceStartTime = Date.now();
-      displays.voiceRecordingBar.classList.remove("hidden");
-      
-      voiceTimerInterval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - voiceStartTime) / 1000);
-        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
-        const secs = String(elapsed % 60).padStart(2, '0');
-        displays.voiceRecTimer.textContent = `${mins}:${secs}`;
-      }, 1000);
-
-      showToast("Recording... Tap microphone button to send");
-    } catch (err) {
-      showToast(err.message || "Microphone permission required.");
-      voiceRecorder = null;
-    }
-  }
-}
-
-function handleCancelVoiceRecord() {
-  if (voiceRecorder) {
-    clearInterval(voiceTimerInterval);
-    voiceRecorder.cleanup();
-    voiceRecorder = null;
-    displays.voiceRecordingBar.classList.add("hidden");
-    showToast("Voice note canceled.");
-  }
-}
-
-function handleReactionClick(msgId, emoji) {
-  if (!currentRoomCode) return;
-  toggleReaction(currentRoomCode, msgId, emoji, currentUid);
-}
-
-function handleReplyClick(msg) {
-  currentReplyMessage = msg;
-  showReplyPreview(msg.text || msg.mediaType || "message");
-  inputs.message.focus();
 }
 
 async function handleCancelRoom() {
@@ -878,10 +585,6 @@ function onSessionEnded() {
     roomUnsubscribe();
     roomUnsubscribe = null;
   }
-  if (typingUnsubscribe) {
-    typingUnsubscribe();
-    typingUnsubscribe = null;
-  }
   showOverlayDisconnected();
 }
 
@@ -893,7 +596,6 @@ function handleReturnHome() {
 function resetAppState() {
   unregisterUnloadCleanup();
   currentRoomCode = null;
-  currentReplyMessage = null;
   
   if (roomUnsubscribe) {
     roomUnsubscribe();
@@ -903,22 +605,13 @@ function resetAppState() {
     chatUnsubscribe();
     chatUnsubscribe = null;
   }
-  if (typingUnsubscribe) {
-    typingUnsubscribe();
-    typingUnsubscribe = null;
-  }
 
   inputs.code.value = "";
   inputs.message.value = "";
   buttons.create.disabled = false;
   buttons.join.disabled = false;
   displays.messagesList.innerHTML = "";
-  hideReplyPreview();
-  hideWipModal();
-  displays.contextMenuModal.classList.add("hidden");
-  closeAllPopovers();
 
-  // Return directly to the Enter Code / Create Room screen!
   updateProfileUI();
   showView("landing");
 }
