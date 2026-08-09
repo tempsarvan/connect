@@ -835,7 +835,9 @@ function resetAppState() {
   displays.contextMenuModal.classList.add("hidden");
   closeAllPopovers();
 
-  showView("showcase");
+  // Return directly to the Enter Code / Create Room screen!
+  updateProfileUI();
+  showView("landing");
 }
 
 init();
