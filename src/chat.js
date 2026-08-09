@@ -1,23 +1,12 @@
-import { db, isConfigured, withTimeout } from "./firebase";
-import { 
-  collection, 
-  addDoc, 
-  doc,
-  setDoc,
-  getDoc,
-  query, 
-  orderBy, 
-  onSnapshot, 
-  serverTimestamp 
-} from "firebase/firestore";
+// Zero-Permission Universal Chat Bus for Connect
 
 let roomChannel = null;
 let globalEventsChannel = null;
-let ntfyChatEventSource = null;
 const messageStore = new Map();
 const typingUsers = new Map();
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
+let chatUnsubscribeCleanup = null;
 
 // Persistent Device Session (3 Days Inactivity Expiry Threshold)
 const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -50,8 +39,6 @@ let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_tim
 
 // Real User Friends List
 let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '[]');
-
-let peerVaultDisabled = false;
 
 // Persistent Saved Public Rooms Section (Dynamic Expanding Array)
 let savedPublicRooms = JSON.parse(localStorage.getItem("connect_saved_public_rooms") || '[]');
@@ -113,20 +100,6 @@ export async function claimUniqueUsername(username, uid) {
 
   registeredUsernames[handle] = uid;
   localStorage.setItem("connect_registered_usernames", JSON.stringify(registeredUsernames));
-
-  if (isConfigured) {
-    try {
-      const userRef = doc(db, "usernames", handle);
-      const snap = await withTimeout(getDoc(userRef), 1500);
-      if (snap.exists() && snap.data().uid !== uid) {
-        throw new Error(`Username ${handle} is already claimed in the global network.`);
-      }
-      await withTimeout(setDoc(userRef, { uid, friendKey, claimedAt: serverTimestamp() }), 1500);
-    } catch (err) {
-      if (err.message && err.message.includes("already claimed")) throw err;
-    }
-  }
-
   return handle;
 }
 
@@ -320,12 +293,12 @@ function notifyMessages() {
   }
 }
 
-// Zero-Config Global Real-time Pub/Sub Chat Sync over ntfy.sh
-function publishNtfyMessage(roomCode, payload) {
+// Zero-Permission Universal Chat Relay over ntfy.sh
+function publishChatMessage(roomCode, payload) {
+  const topic = `connect_msg_${roomCode.toUpperCase()}`;
   try {
-    fetch(`https://ntfy.sh/connect_chat_msg_${roomCode}`, {
+    fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }).catch(() => {});
   } catch (e) {}
@@ -347,7 +320,6 @@ export async function sendMessage(roomCode, uid, payload) {
   if (!text.trim() && !mediaUrl && !soundFx) return;
 
   touchSession();
-
   sendTypingIndicator(roomCode, uid, false, 0);
 
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -385,31 +357,11 @@ export async function sendMessage(roomCode, uid, payload) {
   }
 
   // Cross-device ntfy.sh message broadcast
-  publishNtfyMessage(roomCode, {
+  publishChatMessage(roomCode, {
     type: "CHAT_MESSAGE",
     roomCode,
     message: msgObj
   });
-
-  if (isConfigured) {
-    withTimeout(addDoc(collection(db, "rooms", roomCode, "messages"), {
-      sender: uid,
-      senderName,
-      text: text.trim(),
-      mediaType,
-      mediaUrl,
-      replyTo,
-      effectMode,
-      fileName,
-      fileSize: fileSize || (fileSizeBytes ? formatFileSize(fileSizeBytes) : null),
-      fileSizeBytes,
-      soundFx,
-      vaultMemoryOrigin,
-      reactions: {},
-      localTime: timeStr,
-      timestamp: serverTimestamp()
-    }), 1000).catch(() => {});
-  }
 }
 
 export function deleteMessage(roomCode, messageId) {
@@ -423,7 +375,7 @@ export function deleteMessage(roomCode, messageId) {
     });
   }
 
-  publishNtfyMessage(roomCode, {
+  publishChatMessage(roomCode, {
     type: "DELETE_MESSAGE",
     messageId
   });
@@ -465,14 +417,44 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
 
   roomChannel.onmessage = (event) => handleMessagePayload(event.data);
 
-  // Cross-device SSE listener over ntfy.sh
-  if (ntfyChatEventSource) ntfyChatEventSource.close();
+  // Universal HTTP Polling + SSE Chat Listener
+  const topic = `connect_msg_${roomCode.toUpperCase()}`;
+  const processedMsgIds = new Set();
+  let isClosed = false;
+
+  // 1. Polling every 1 second
+  const pollInterval = setInterval(async () => {
+    if (isClosed) return;
+    try {
+      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1`);
+      if (res.ok) {
+        const text = await res.text();
+        const lines = text.trim().split("\n");
+        lines.forEach((line) => {
+          if (!line) return;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed && parsed.id && !processedMsgIds.has(parsed.id) && parsed.message) {
+              processedMsgIds.add(parsed.id);
+              const payload = JSON.parse(parsed.message);
+              handleMessagePayload(payload);
+            }
+          } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  }, 1000);
+
+  // 2. SSE Stream (/sse)
+  let sse = null;
   try {
-    ntfyChatEventSource = new EventSource(`https://ntfy.sh/connect_chat_msg_${roomCode}/json`);
-    ntfyChatEventSource.onmessage = (event) => {
+    sse = new EventSource(`https://ntfy.sh/${topic}/sse`);
+    sse.onmessage = (event) => {
+      if (isClosed) return;
       try {
         const parsed = JSON.parse(event.data);
-        if (parsed && parsed.message) {
+        if (parsed && parsed.id && !processedMsgIds.has(parsed.id) && parsed.message) {
+          processedMsgIds.add(parsed.id);
           const payload = JSON.parse(parsed.message);
           handleMessagePayload(payload);
         }
@@ -480,62 +462,12 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     };
   } catch (e) {}
 
-  let unsubFirestore = null;
-  if (isConfigured) {
-    try {
-      const messagesRef = collection(db, "rooms", roomCode, "messages");
-      const q = query(messagesRef, orderBy("timestamp", "asc"));
-      
-      unsubFirestore = onSnapshot(q, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          const id = change.doc.id;
-          const data = change.doc.data();
-
-          if (change.type === "added") {
-            let timeStr = data.localTime;
-            if (data.timestamp && data.timestamp.toDate) {
-              timeStr = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            } else if (!timeStr) {
-              timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }
-
-            if (!messageStore.has(id)) {
-              messageStore.set(id, {
-                id,
-                sender: data.sender,
-                senderName: data.senderName || "@anonymous",
-                text: data.text || "",
-                mediaType: data.mediaType || "text",
-                mediaUrl: data.mediaUrl || null,
-                replyTo: data.replyTo || null,
-                effectMode: data.effectMode || "normal",
-                fileName: data.fileName || null,
-                fileSize: data.fileSize || null,
-                fileSizeBytes: data.fileSizeBytes || null,
-                soundFx: data.soundFx || null,
-                vaultMemoryOrigin: data.vaultMemoryOrigin || null,
-                reactions: data.reactions || {},
-                localTime: timeStr,
-                timestamp: data.timestamp ? data.timestamp.toMillis() : Date.now()
-              });
-            }
-          } else if (change.type === "removed") {
-            messageStore.delete(id);
-          }
-        });
-        notifyMessages();
-      });
-    } catch (err) {}
-  }
-
   notifyMessages();
 
   return () => {
-    if (ntfyChatEventSource) {
-      ntfyChatEventSource.close();
-      ntfyChatEventSource = null;
-    }
-    if (unsubFirestore) unsubFirestore();
+    isClosed = true;
+    clearInterval(pollInterval);
+    if (sse) sse.close();
     if (roomChannel) {
       roomChannel.close();
       roomChannel = null;
@@ -549,6 +481,6 @@ export function purgeLocalMessages(roomCode) {
   if (roomChannel) {
     roomChannel.postMessage({ type: "PURGE_CHAT" });
   }
-  publishNtfyMessage(roomCode, { type: "PURGE_CHAT" });
+  publishChatMessage(roomCode, { type: "PURGE_CHAT" });
   notifyMessages();
 }
