@@ -41,6 +41,7 @@ import {
   renderNotifications,
   initMediaPopovers,
   initEmojiPanel,
+  initDoodleStudio,
   showReplyPreview,
   hideReplyPreview,
   closeLightbox,
@@ -71,6 +72,7 @@ async function init() {
 
   initMediaPopovers(handleSendGif, handleSendSticker);
   initEmojiPanel(handleSelectEmoji);
+  initDoodleStudio(handleSendDoodle);
   
   listenToNotifications((notifs, unread) => {
     renderNotifications(notifs, unread);
@@ -114,12 +116,11 @@ function setupEventListeners() {
 
   // Media Attachments
   inputs.photoUpload.addEventListener("change", handlePhotoUpload);
+  inputs.fileUpload.addEventListener("change", handleFileUpload);
 
   // Emojis Popover Toggle
   buttons.toggleEmojis.addEventListener("click", () => {
-    displays.popoverGifs.classList.add("hidden");
-    displays.popoverStickers.classList.add("hidden");
-    displays.popoverNotifications.classList.add("hidden");
+    closeAllPopovers();
     displays.popoverEmojis.classList.toggle("hidden");
   });
 
@@ -129,9 +130,7 @@ function setupEventListeners() {
 
   // GIFs Popover Toggle
   buttons.toggleGifs.addEventListener("click", () => {
-    displays.popoverEmojis.classList.add("hidden");
-    displays.popoverStickers.classList.add("hidden");
-    displays.popoverNotifications.classList.add("hidden");
+    closeAllPopovers();
     displays.popoverGifs.classList.toggle("hidden");
   });
 
@@ -141,9 +140,7 @@ function setupEventListeners() {
 
   // Stickers Popover Toggle
   buttons.toggleStickers.addEventListener("click", () => {
-    displays.popoverEmojis.classList.add("hidden");
-    displays.popoverGifs.classList.add("hidden");
-    displays.popoverNotifications.classList.add("hidden");
+    closeAllPopovers();
     displays.popoverStickers.classList.toggle("hidden");
   });
 
@@ -151,11 +148,38 @@ function setupEventListeners() {
     displays.popoverStickers.classList.add("hidden");
   });
 
+  // Doodle Canvas Studio Toggle
+  buttons.toggleDraw.addEventListener("click", () => {
+    closeAllPopovers();
+    displays.popoverDraw.classList.toggle("hidden");
+  });
+
+  buttons.closeDraw.addEventListener("click", () => {
+    displays.popoverDraw.classList.add("hidden");
+  });
+
+  // Live Soundboard FX Toggle
+  buttons.toggleSoundboard.addEventListener("click", () => {
+    closeAllPopovers();
+    displays.popoverSoundboard.classList.toggle("hidden");
+  });
+
+  buttons.closeSoundboard.addEventListener("click", () => {
+    displays.popoverSoundboard.classList.add("hidden");
+  });
+
+  document.querySelectorAll(".sound-fx-btn").forEach((btn) => {
+    btn.onclick = () => {
+      const fx = btn.getAttribute("data-fx");
+      soundEngine.playSoundFX(fx);
+      showToast(`Sound FX: ${btn.textContent}`);
+      displays.popoverSoundboard.classList.add("hidden");
+    };
+  });
+
   // Notifications Drawer
   buttons.notifications.addEventListener("click", () => {
-    displays.popoverEmojis.classList.add("hidden");
-    displays.popoverGifs.classList.add("hidden");
-    displays.popoverStickers.classList.add("hidden");
+    closeAllPopovers();
     displays.popoverNotifications.classList.toggle("hidden");
     markAllAsRead();
   });
@@ -189,6 +213,15 @@ function setupEventListeners() {
   });
 
   buttons.closeLightbox.addEventListener("click", closeLightbox);
+}
+
+function closeAllPopovers() {
+  displays.popoverEmojis.classList.add("hidden");
+  displays.popoverGifs.classList.add("hidden");
+  displays.popoverStickers.classList.add("hidden");
+  displays.popoverDraw.classList.add("hidden");
+  displays.popoverSoundboard.classList.add("hidden");
+  displays.popoverNotifications.classList.add("hidden");
 }
 
 function handleSelectEmoji(char) {
@@ -286,6 +319,7 @@ function startChatSession() {
         else if (lastMsg.mediaType === "gif") notifText = "Sent a GIF";
         else if (lastMsg.mediaType === "sticker") notifText = "Sent a sticker";
         else if (lastMsg.mediaType === "audio") notifText = "Sent a voice note";
+        else if (lastMsg.mediaType === "file") notifText = `Shared file ${lastMsg.fileName || ''}`;
 
         addNotification("New Message", notifText, "💬");
       }
@@ -316,11 +350,13 @@ async function handleSendMessage() {
   const text = inputs.message.value.trim();
   if (!text || !currentRoomCode) return;
 
+  const effectMode = inputs.selectEffectMode.value;
   inputs.message.value = "";
   
   const payload = {
     text,
     mediaType: "text",
+    effectMode,
     replyTo: currentReplyMessage ? { id: currentReplyMessage.id, text: currentReplyMessage.text } : null
   };
 
@@ -349,6 +385,42 @@ async function handlePhotoUpload(e) {
   } catch (err) {
     showToast("Could not send image: " + err.message);
   }
+}
+
+async function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file || !currentRoomCode) return;
+
+  try {
+    showToast("Attaching document...");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result;
+      const sizeMb = (file.size / 1024 / 1024).toFixed(2);
+      
+      await sendMessage(currentRoomCode, currentUid, {
+        text: file.name,
+        mediaType: "file",
+        mediaUrl: dataUrl,
+        fileName: file.name,
+        fileSize: `${sizeMb} MB`
+      });
+
+      inputs.fileUpload.value = "";
+    };
+    reader.readAsDataURL(file);
+  } catch (err) {
+    showToast("Could not send file: " + err.message);
+  }
+}
+
+async function handleSendDoodle(sketchDataUrl) {
+  if (!currentRoomCode) return;
+  await sendMessage(currentRoomCode, currentUid, {
+    text: "Hand-drawn Sketch",
+    mediaType: "image",
+    mediaUrl: sketchDataUrl
+  });
 }
 
 async function handleSendGif(gifUrl) {
@@ -492,10 +564,7 @@ function resetAppState() {
   displays.messagesList.innerHTML = "";
   hideReplyPreview();
   hideWipModal();
-  displays.popoverEmojis.classList.add("hidden");
-  displays.popoverGifs.classList.add("hidden");
-  displays.popoverStickers.classList.add("hidden");
-  displays.popoverNotifications.classList.add("hidden");
+  closeAllPopovers();
 
   showView("landing");
 }

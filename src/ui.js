@@ -20,6 +20,12 @@ export const buttons = {
   closeGifs: document.getElementById("btn-close-gifs"),
   toggleStickers: document.getElementById("btn-toggle-stickers"),
   closeStickers: document.getElementById("btn-close-stickers"),
+  toggleDraw: document.getElementById("btn-toggle-draw"),
+  closeDraw: document.getElementById("btn-close-draw"),
+  clearDraw: document.getElementById("btn-clear-draw"),
+  sendDraw: document.getElementById("btn-send-draw"),
+  toggleSoundboard: document.getElementById("btn-toggle-soundboard"),
+  closeSoundboard: document.getElementById("btn-close-soundboard"),
   recordVoice: document.getElementById("btn-record-voice"),
   cancelVoice: document.getElementById("btn-cancel-voice"),
   cancelReply: document.getElementById("btn-cancel-reply"),
@@ -35,7 +41,9 @@ export const buttons = {
 export const inputs = {
   code: document.getElementById("input-code"),
   message: document.getElementById("input-message"),
-  photoUpload: document.getElementById("input-photo-upload")
+  photoUpload: document.getElementById("input-photo-upload"),
+  fileUpload: document.getElementById("input-file-upload"),
+  selectEffectMode: document.getElementById("select-effect-mode")
 };
 
 export const displays = {
@@ -53,6 +61,9 @@ export const displays = {
   gifsGrid: document.getElementById("gifs-grid"),
   popoverStickers: document.getElementById("popover-stickers"),
   stickersGrid: document.getElementById("stickers-grid"),
+  popoverDraw: document.getElementById("popover-draw"),
+  drawCanvas: document.getElementById("draw-canvas"),
+  popoverSoundboard: document.getElementById("popover-soundboard"),
   replyPreviewBar: document.getElementById("reply-preview-bar"),
   replyPreviewText: document.getElementById("reply-preview-text"),
   voiceRecordingBar: document.getElementById("voice-recording-bar"),
@@ -151,6 +162,80 @@ export function renderNotifications(notificationsList, unreadCount) {
     `;
     displays.notificationsList.appendChild(item);
   });
+}
+
+// Doodle Studio Canvas Logic
+let drawCtx = null;
+let isDrawing = false;
+let currentDrawColor = "#ffffff";
+
+export function initDoodleStudio(onSendSketch) {
+  const canvas = displays.drawCanvas;
+  drawCtx = canvas.getContext("2d");
+  
+  drawCtx.fillStyle = "#000000";
+  drawCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const swatches = document.querySelectorAll(".color-swatch");
+  swatches.forEach((swatch) => {
+    swatch.onclick = () => {
+      swatches.forEach((s) => s.classList.remove("active"));
+      swatch.classList.add("active");
+      currentDrawColor = swatch.getAttribute("data-color");
+    };
+  });
+
+  const getPos = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  };
+
+  const startDrawing = (e) => {
+    isDrawing = true;
+    const pos = getPos(e);
+    drawCtx.beginPath();
+    drawCtx.moveTo(pos.x, pos.y);
+  };
+
+  const drawMove = (e) => {
+    if (!isDrawing) return;
+    const pos = getPos(e);
+    drawCtx.strokeStyle = currentDrawColor;
+    drawCtx.lineWidth = 3;
+    drawCtx.lineCap = "round";
+    drawCtx.lineTo(pos.x, pos.y);
+    drawCtx.stroke();
+  };
+
+  const stopDrawing = () => {
+    isDrawing = false;
+  };
+
+  canvas.addEventListener("mousedown", startDrawing);
+  canvas.addEventListener("mousemove", drawMove);
+  window.addEventListener("mouseup", stopDrawing);
+
+  canvas.addEventListener("touchstart", startDrawing);
+  canvas.addEventListener("touchmove", drawMove);
+  window.addEventListener("touchend", stopDrawing);
+
+  buttons.clearDraw.onclick = () => {
+    drawCtx.fillStyle = "#000000";
+    drawCtx.fillRect(0, 0, canvas.width, canvas.height);
+  };
+
+  buttons.sendDraw.onclick = () => {
+    const dataUrl = canvas.toDataURL("image/png");
+    onSendSketch(dataUrl);
+    displays.popoverDraw.classList.add("hidden");
+    drawCtx.fillStyle = "#000000";
+    drawCtx.fillRect(0, 0, canvas.width, canvas.height);
+  };
 }
 
 export function initEmojiPanel(onSelectEmoji) {
@@ -270,6 +355,22 @@ function createCustomAudioPlayer(audioUrl) {
   return container;
 }
 
+function parseFormattedText(text, isSpoiler = false) {
+  if (!text) return "";
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*(.*?)\*/g, "<strong>$1</strong>")
+    .replace(/_(.*?)_/g, "<em>$1</em>")
+    .replace(/~(.*?)~/g, '<span class="msg-spoiler" onclick="this.classList.toggle(\'revealed\')">$1</span>');
+
+  if (isSpoiler) {
+    html = `<span class="msg-spoiler" onclick="this.classList.toggle('revealed')">${html}</span>`;
+  }
+  return html;
+}
+
 export function renderMessages(messages, currentUid, onReactionClick, onReplyClick) {
   displays.messagesList.innerHTML = "";
 
@@ -285,7 +386,9 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     const row = document.createElement("div");
     const isMe = msg.sender === currentUid;
     
-    row.className = `msg-row ${isMe ? "me" : "peer"}`;
+    let rowClasses = `msg-row ${isMe ? "me" : "peer"}`;
+    if (msg.effectMode === "shake") rowClasses += " effect-shake";
+    row.className = rowClasses;
 
     if (msg.replyTo) {
       const quote = document.createElement("div");
@@ -297,7 +400,19 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
 
-    if (msg.mediaType === "image" && msg.mediaUrl) {
+    if (msg.mediaType === "file" && msg.mediaUrl) {
+      const card = document.createElement("div");
+      card.className = "msg-file-card";
+      card.innerHTML = `
+        <div class="msg-file-icon">📄</div>
+        <div class="msg-file-info">
+          <span class="msg-file-name">${msg.fileName || "Document"}</span>
+          <span class="msg-file-size">${msg.fileSize || "File"}</span>
+          <a href="${msg.mediaUrl}" download="${msg.fileName || 'file'}" class="msg-file-download">⬇️ Download File</a>
+        </div>
+      `;
+      bubble.appendChild(card);
+    } else if (msg.mediaType === "image" && msg.mediaUrl) {
       const img = document.createElement("img");
       img.src = msg.mediaUrl;
       img.className = "msg-media-img";
@@ -307,7 +422,7 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       if (msg.text) {
         const textNode = document.createElement("div");
         textNode.style.marginTop = "6px";
-        textNode.textContent = msg.text;
+        textNode.innerHTML = parseFormattedText(msg.text, msg.effectMode === "spoiler");
         bubble.appendChild(textNode);
       }
     } else if (msg.mediaType === "gif" && msg.mediaUrl) {
@@ -329,7 +444,7 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       const player = createCustomAudioPlayer(msg.mediaUrl);
       bubble.appendChild(player);
     } else {
-      bubble.textContent = msg.text;
+      bubble.innerHTML = parseFormattedText(msg.text, msg.effectMode === "spoiler");
     }
 
     row.appendChild(bubble);
