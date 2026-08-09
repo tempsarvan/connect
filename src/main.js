@@ -16,6 +16,9 @@ import {
   saveUserSettings,
   getUsername,
   getPassword,
+  getSoundEnabled,
+  getVaultEnabled,
+  isSelfVaultDisabled,
   getSavedVaultMessages,
   saveMessageToVault,
   removeSavedMessageFromVault
@@ -101,14 +104,49 @@ async function init() {
 function updateProfileUI() {
   const uname = getUsername();
   const pwd = getPassword();
-  inputs.username.value = uname;
-  if (inputs.password) inputs.password.value = pwd;
-  
+  const soundOn = getSoundEnabled();
+  const vaultOn = !isSelfVaultDisabled();
+
+  inputs.settingUsername.value = uname;
+  inputs.settingPassword.value = pwd;
+  inputs.settingToggleSound.checked = soundOn;
+  inputs.settingToggleVault.checked = vaultOn;
+
   displays.landingUsernameLabel.textContent = `@${uname}`;
   displays.chatHeaderUsername.textContent = uname;
 }
 
+function openFullscreenSettings() {
+  updateProfileUI();
+  displays.modalSettingsFullscreen.classList.remove("hidden");
+}
+
+function closeFullscreenSettings() {
+  displays.modalSettingsFullscreen.classList.add("hidden");
+}
+
+function handleSaveSettings() {
+  const uname = inputs.settingUsername.value.trim();
+  const pwd = inputs.settingPassword.value.trim();
+  const soundOn = inputs.settingToggleSound.checked;
+  const vaultOn = inputs.settingToggleVault.checked;
+
+  if (!uname) {
+    showToast("Please enter a valid username");
+    return;
+  }
+
+  saveUserSettings(uname, pwd, soundOn, vaultOn);
+  updateProfileUI();
+  closeFullscreenSettings();
+  showToast("Settings applied & saved");
+}
+
 function handleSendFromVault(vaultMsg) {
+  if (!getVaultEnabled()) {
+    showToast("Vault Memory is disabled for this session.");
+    return;
+  }
   if (!currentRoomCode) {
     showToast("Join or create a room to send Vault items");
     return;
@@ -125,7 +163,7 @@ function handleSendFromVault(vaultMsg) {
     vaultMemoryOrigin: vaultMsg.vaultSavedAt || vaultMsg.localTime || "Past Session"
   });
 
-  showToast("Vault Memory dropped into chat");
+  showToast("Vault Archive Memory dropped into chat");
 }
 
 function setupEventListeners() {
@@ -134,6 +172,7 @@ function setupEventListeners() {
     const uname = inputs.setupUsername.value.trim();
     const pwd = inputs.setupPassword.value.trim();
     const soundOn = inputs.setupSoundToggle.checked;
+    const vaultOn = inputs.setupVaultToggle.checked;
 
     if (!uname) {
       showToast("Please enter a username or handle");
@@ -144,22 +183,20 @@ function setupEventListeners() {
       return;
     }
 
-    saveUserSettings(uname, pwd, soundOn);
+    saveUserSettings(uname, pwd, soundOn, vaultOn);
     updateProfileUI();
     showToast(`Welcome @${uname}! Profile setup complete.`);
     showView("landing");
   });
 
   // Top-Right Corner Settings Gear Buttons
-  buttons.gearLanding.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverProfile.classList.remove("hidden");
-  });
+  buttons.gearLanding.addEventListener("click", openFullscreenSettings);
+  buttons.gearChat.addEventListener("click", openFullscreenSettings);
+  buttons.profileLanding.addEventListener("click", openFullscreenSettings);
+  buttons.profileHeader.addEventListener("click", openFullscreenSettings);
 
-  buttons.gearChat.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverProfile.classList.remove("hidden");
-  });
+  buttons.closeFullscreenSettings.addEventListener("click", closeFullscreenSettings);
+  buttons.saveFullscreenSettings.addEventListener("click", handleSaveSettings);
 
   // Navigation & Rooms
   buttons.create.addEventListener("click", handleCreateRoom);
@@ -184,44 +221,20 @@ function setupEventListeners() {
   buttons.endSession.addEventListener("click", handleEndSession);
   buttons.returnHome.addEventListener("click", handleReturnHome);
 
-  // Profile Popover Handlers
-  buttons.profileLanding.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverProfile.classList.remove("hidden");
-  });
-
-  buttons.profileHeader.addEventListener("click", () => {
-    closeAllPopovers();
-    displays.popoverProfile.classList.remove("hidden");
-  });
-
-  buttons.closeProfile.addEventListener("click", () => {
-    displays.popoverProfile.classList.add("hidden");
-  });
-
-  buttons.saveProfile.addEventListener("click", () => {
-    const uname = inputs.username.value.trim();
-    const pwd = inputs.password ? inputs.password.value.trim() : getPassword();
-    if (uname) {
-      saveUserSettings(uname, pwd, true);
-      updateProfileUI();
-      displays.popoverProfile.classList.add("hidden");
-      showToast(`Settings updated for @${uname}`);
-    }
-  });
-
   // Saved History Vault Handlers
   buttons.toggleSaved.addEventListener("click", () => {
     closeAllPopovers();
     const vault = getSavedVaultMessages();
+    const vaultDisabled = !getVaultEnabled();
     renderSavedVault(
       vault,
       (msgId) => {
         const updated = removeSavedMessageFromVault(msgId);
-        renderSavedVault(updated, (id) => removeSavedMessageFromVault(id), handleSendFromVault);
+        renderSavedVault(updated, (id) => removeSavedMessageFromVault(id), handleSendFromVault, vaultDisabled);
         showToast("Removed from Vault");
       },
-      handleSendFromVault
+      handleSendFromVault,
+      vaultDisabled
     );
     displays.popoverSaved.classList.toggle("hidden");
   });
@@ -244,9 +257,13 @@ function setupEventListeners() {
 
   buttons.contextSave.addEventListener("click", () => {
     if (selectedContextMenuMessage) {
-      saveMessageToVault(selectedContextMenuMessage);
-      displays.contextMenuModal.classList.add("hidden");
-      showToast("Saved to Vault Memory");
+      try {
+        saveMessageToVault(selectedContextMenuMessage);
+        displays.contextMenuModal.classList.add("hidden");
+        showToast("Saved to Vault Memory");
+      } catch (err) {
+        showToast(err.message);
+      }
     }
   });
 
@@ -386,7 +403,7 @@ function setupEventListeners() {
 }
 
 function closeAllPopovers() {
-  displays.popoverProfile.classList.add("hidden");
+  displays.modalSettingsFullscreen.classList.add("hidden");
   displays.popoverSaved.classList.add("hidden");
   displays.popoverEmojis.classList.add("hidden");
   displays.popoverGifs.classList.add("hidden");
@@ -491,7 +508,7 @@ function startChatSession() {
       const lastMsg = messages[messages.length - 1];
 
       // Handle Soundboard FX playback for both sender and recipient
-      if (lastMsg.mediaType === "sound_fx" && lastMsg.soundFx) {
+      if (lastMsg.mediaType === "sound_fx" && lastMsg.soundFx && getSoundEnabled()) {
         soundEngine.playSoundFX(lastMsg.soundFx);
       }
 
@@ -502,7 +519,7 @@ function startChatSession() {
 
       // Handle Notifications & Chimes
       if (previousMsgCount > 0 && lastMsg.sender !== currentUid) {
-        if (lastMsg.mediaType !== "sound_fx") soundEngine.playMessageDing();
+        if (lastMsg.mediaType !== "sound_fx" && getSoundEnabled()) soundEngine.playMessageDing();
         
         let notifText = lastMsg.text;
         if (lastMsg.mediaType === "image") notifText = "Sent a photo";

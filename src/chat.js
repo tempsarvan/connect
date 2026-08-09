@@ -14,29 +14,41 @@ const typingUsers = new Set();
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
 
-// Persistent User Settings & System Memory (Username, Passcode PIN, Preferences)
+// Persistent User Settings & System Memory
 let currentUsername = localStorage.getItem("connect_username") || "";
 let currentPassword = localStorage.getItem("connect_password") || "";
 let isSoundEnabled = localStorage.getItem("connect_sound_enabled") !== "false";
+let isVaultEnabled = localStorage.getItem("connect_vault_enabled") !== "false";
 let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
 let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
+
+let peerVaultDisabled = false;
 
 export function hasCompletedSetup() {
   return isSetupCompleted && currentUsername.trim().length > 0;
 }
 
-export function saveUserSettings(name, password, soundOn = true) {
+export function saveUserSettings(name, password, soundOn = true, vaultOn = true) {
   currentUsername = name.trim() || "Anonymous";
   currentPassword = password.trim();
   isSoundEnabled = soundOn;
+  isVaultEnabled = vaultOn;
   isSetupCompleted = true;
 
   localStorage.setItem("connect_username", currentUsername);
   localStorage.setItem("connect_password", currentPassword);
   localStorage.setItem("connect_sound_enabled", isSoundEnabled ? "true" : "false");
+  localStorage.setItem("connect_vault_enabled", isVaultEnabled ? "true" : "false");
   localStorage.setItem("connect_setup_completed", "true");
 
-  return { username: currentUsername, password: currentPassword, soundEnabled: isSoundEnabled };
+  if (roomChannel) {
+    roomChannel.postMessage({
+      type: "ROOM_SETTINGS_UPDATE",
+      vaultDisabled: !isVaultEnabled
+    });
+  }
+
+  return { username: currentUsername, password: currentPassword, soundEnabled: isSoundEnabled, vaultEnabled: isVaultEnabled };
 }
 
 export function getUsername() {
@@ -51,11 +63,26 @@ export function getSoundEnabled() {
   return isSoundEnabled;
 }
 
+export function getVaultEnabled() {
+  return isVaultEnabled && !peerVaultDisabled;
+}
+
+export function isSelfVaultDisabled() {
+  return !isVaultEnabled;
+}
+
+export function setPeerVaultDisabled(disabled) {
+  peerVaultDisabled = disabled;
+}
+
 export function getSavedVaultMessages() {
   return savedVaultMessages;
 }
 
 export function saveMessageToVault(msg) {
+  if (!getVaultEnabled()) {
+    throw new Error("Vault Memory is turned off for this room session.");
+  }
   if (!savedVaultMessages.some((m) => m.id === msg.id)) {
     const fullDate = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     const vaultItem = {
@@ -219,10 +246,18 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   }
   roomChannel = new BroadcastChannel(`connect_chat_${roomCode}`);
 
+  // Broadcast initial settings state
+  roomChannel.postMessage({
+    type: "ROOM_SETTINGS_UPDATE",
+    vaultDisabled: !isVaultEnabled
+  });
+
   roomChannel.onmessage = (event) => {
-    const { type, message, messageId, reactions, uid: typingUid, isTyping } = event.data || {};
+    const { type, message, messageId, reactions, uid: typingUid, isTyping, vaultDisabled } = event.data || {};
     
-    if (type === "CHAT_MESSAGE" && message) {
+    if (type === "ROOM_SETTINGS_UPDATE") {
+      setPeerVaultDisabled(!!vaultDisabled);
+    } else if (type === "CHAT_MESSAGE" && message) {
       if (!messageStore.has(message.id)) {
         messageStore.set(message.id, message);
         notifyMessages();

@@ -43,6 +43,10 @@
           <div class="form-group">
             <label class="form-label">Preferred Settings</label>
             <div class="setting-row">
+              <span>Enable Vault Memory</span>
+              <input id="setup-vault-toggle" type="checkbox" class="toggle-checkbox" checked>
+            </div>
+            <div class="setting-row">
               <span>Message Chimes & FX</span>
               <input id="setup-sound-toggle" type="checkbox" class="toggle-checkbox" checked>
             </div>
@@ -56,7 +60,7 @@
     <!-- Landing View -->
     <section id="view-landing" class="view active">
       <!-- Top-Right Settings Gear Button -->
-      <button id="btn-gear-landing" class="btn-settings-gear" title="Settings & Profile">
+      <button id="btn-gear-landing" class="btn-settings-gear" title="Settings & Preferences">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -200,31 +204,6 @@
       </div>
 
       <!-- Popovers -->
-      <!-- Profile & Settings Modal Popover -->
-      <div id="popover-profile" class="popover popover-profile hidden">
-        <div class="popover-header">
-          <span>Profile & Preferences</span>
-          <button id="btn-close-profile" class="btn-icon">✕</button>
-        </div>
-        <div class="profile-body">
-          <div class="profile-avatar-display">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
-          </div>
-          <div class="form-group" style="width:100%;">
-            <label class="profile-input-label">Username / Handle</label>
-            <input id="input-username" type="text" class="input-username" placeholder="e.g. @sarvan or Alex" maxlength="20">
-          </div>
-          <div class="form-group" style="width:100%;">
-            <label class="profile-input-label">Private Key / Password</label>
-            <input id="input-password" type="password" class="input-username" placeholder="Passcode" maxlength="30">
-          </div>
-          <button id="btn-save-profile" class="btn btn-primary" style="width:100%; margin-top:4px;">Update Settings</button>
-        </div>
-      </div>
-
       <!-- Saved Vault Memory Drawer Popover -->
       <div id="popover-saved" class="popover popover-saved hidden">
         <div class="popover-header">
@@ -415,6 +394,83 @@
         </button>
       </footer>
     </section>
+
+    <!-- Full-Screen Scrollable Settings & Preferences Modal -->
+    <div id="modal-settings-fullscreen" class="fullscreen-settings-modal hidden">
+      <header class="fullscreen-settings-header">
+        <div class="settings-title-group">
+          <h2>Preferences & System Settings</h2>
+          <p>Customize your profile, security passcode, and room features.</p>
+        </div>
+        <button id="btn-close-fullscreen-settings" class="btn-icon" aria-label="Close settings">✕</button>
+      </header>
+
+      <div class="fullscreen-settings-body">
+        <div class="settings-section">
+          <h3>User Profile Credentials</h3>
+          <div class="form-group">
+            <label class="form-label">Display Name / Handle</label>
+            <input id="setting-input-username" type="text" class="input-field" placeholder="@username" maxlength="20">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Private Vault Passcode / PIN</label>
+            <input id="setting-input-password" type="password" class="input-field" placeholder="Secret PIN" maxlength="30">
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>Room Session Toggles & Preferences</h3>
+          
+          <div class="setting-toggle-card">
+            <div class="setting-toggle-info">
+              <div class="setting-toggle-title">Enable Vault Memory</div>
+              <div class="setting-toggle-desc">When disabled, Vault Memory saving and history dropping is turned off for BOTH participants in the room session.</div>
+            </div>
+            <label class="ui-switch">
+              <input id="setting-toggle-vault" type="checkbox" checked>
+              <span class="ui-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-toggle-card">
+            <div class="setting-toggle-info">
+              <div class="setting-toggle-title">Message Sound FX & Chimes</div>
+              <div class="setting-toggle-desc">Play audio chimes on incoming messages and live soundboard effects.</div>
+            </div>
+            <label class="ui-switch">
+              <input id="setting-toggle-sound" type="checkbox" checked>
+              <span class="ui-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-toggle-card">
+            <div class="setting-toggle-info">
+              <div class="setting-toggle-title">Live Typing Indicators</div>
+              <div class="setting-toggle-desc">Show real-time typing indicators when a connected peer is typing.</div>
+            </div>
+            <label class="ui-switch">
+              <input id="setting-toggle-typing" type="checkbox" checked>
+              <span class="ui-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-toggle-card">
+            <div class="setting-toggle-info">
+              <div class="setting-toggle-title">Confetti & Visual Effects</div>
+              <div class="setting-toggle-desc">Render full-screen confetti bursts when message effects are triggered.</div>
+            </div>
+            <label class="ui-switch">
+              <input id="setting-toggle-effects" type="checkbox" checked>
+              <span class="ui-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-footer-actions">
+          <button id="btn-save-fullscreen-settings" class="btn btn-primary" style="width:100%; height:48px;">Apply & Save Preferences</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Interactive Message Action Context Menu Modal -->
     <div id="context-menu-modal" class="context-menu-modal hidden">

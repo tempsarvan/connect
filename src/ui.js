@@ -11,6 +11,8 @@ export const buttons = {
   completeSetup: document.getElementById("btn-complete-setup"),
   gearLanding: document.getElementById("btn-gear-landing"),
   gearChat: document.getElementById("btn-gear-chat"),
+  closeFullscreenSettings: document.getElementById("btn-close-fullscreen-settings"),
+  saveFullscreenSettings: document.getElementById("btn-save-fullscreen-settings"),
   create: document.getElementById("btn-create"),
   join: document.getElementById("btn-join"),
   copyCode: document.getElementById("btn-copy-code"),
@@ -20,8 +22,6 @@ export const buttons = {
   returnHome: document.getElementById("btn-return-home"),
   profileLanding: document.getElementById("btn-profile-landing"),
   profileHeader: document.getElementById("btn-profile-header"),
-  saveProfile: document.getElementById("btn-save-profile"),
-  closeProfile: document.getElementById("btn-close-profile"),
   toggleSaved: document.getElementById("btn-toggle-saved"),
   closeSaved: document.getElementById("btn-close-saved"),
   closeContext: document.getElementById("btn-close-context"),
@@ -56,17 +56,21 @@ export const buttons = {
 export const inputs = {
   setupUsername: document.getElementById("setup-username"),
   setupPassword: document.getElementById("setup-password"),
+  setupVaultToggle: document.getElementById("setup-vault-toggle"),
   setupSoundToggle: document.getElementById("setup-sound-toggle"),
+  settingUsername: document.getElementById("setting-input-username"),
+  settingPassword: document.getElementById("setting-input-password"),
+  settingToggleVault: document.getElementById("setting-toggle-vault"),
+  settingToggleSound: document.getElementById("setting-toggle-sound"),
   code: document.getElementById("input-code"),
   message: document.getElementById("input-message"),
-  username: document.getElementById("input-username"),
-  password: document.getElementById("input-password"),
   photoUpload: document.getElementById("input-photo-upload"),
   fileUpload: document.getElementById("input-file-upload"),
   selectEffectMode: document.getElementById("select-effect-mode")
 };
 
 export const displays = {
+  modalSettingsFullscreen: document.getElementById("modal-settings-fullscreen"),
   roomCode: document.getElementById("room-code-display"),
   chatRoomCode: document.getElementById("chat-room-code"),
   messagesList: document.getElementById("messages-list"),
@@ -74,7 +78,6 @@ export const displays = {
   overlayDisconnected: document.getElementById("overlay-disconnected"),
   toast: document.getElementById("toast"),
   typingIndicator: document.getElementById("typing-indicator"),
-  popoverProfile: document.getElementById("popover-profile"),
   landingUsernameLabel: document.getElementById("landing-username-label"),
   chatHeaderUsername: document.getElementById("chat-header-username"),
   popoverSaved: document.getElementById("popover-saved"),
@@ -162,8 +165,12 @@ export function hideReplyPreview() {
   displays.replyPreviewText.textContent = "";
 }
 
-export function renderSavedVault(savedMessages, onRemoveSaved, onSendFromVault) {
+export function renderSavedVault(savedMessages, onRemoveSaved, onSendFromVault, isVaultDisabled = false) {
   displays.savedVaultList.innerHTML = "";
+  if (isVaultDisabled) {
+    displays.savedVaultList.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--danger); font-size: 0.8rem;">⚠️ Vault Memory is turned off by room session settings</div>`;
+    return;
+  }
   if (savedMessages.length === 0) {
     displays.savedVaultList.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.8rem;">No saved vault messages yet</div>`;
     return;
@@ -505,15 +512,18 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
     bubble.className = "msg-bubble";
     bubble.onclick = () => onMessageClick(msg);
 
-    // Display Vault Memory Origin Badge if sent from Vault
+    // Display Vault Memory Archive Container if sent from Vault
     if (msg.vaultMemoryOrigin) {
-      const vBadge = document.createElement("div");
-      vBadge.className = "msg-vault-origin";
-      vBadge.innerHTML = `
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-        <span>Vault Memory • Originally saved on ${msg.vaultMemoryOrigin}</span>
+      const vBox = document.createElement("div");
+      vBox.className = "msg-vault-archive-box";
+      vBox.innerHTML = `
+        <div class="msg-vault-archive-header">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <span>Vault Archive Memory</span>
+        </div>
+        <div class="msg-vault-archive-desc">Retrieved from Vault Memory saved on ${msg.vaultMemoryOrigin}</div>
       `;
-      bubble.appendChild(vBadge);
+      bubble.appendChild(vBox);
     }
 
     if (msg.mediaType === "sound_fx") {
@@ -574,7 +584,9 @@ export function renderMessages(messages, currentUid, onReactionClick, onReplyCli
       const player = createCustomAudioPlayer(msg.mediaUrl);
       bubble.appendChild(player);
     } else {
-      bubble.innerHTML = parseFormattedText(msg.text, msg.effectMode === "spoiler");
+      const textNode = document.createElement("div");
+      textNode.innerHTML = parseFormattedText(msg.text, msg.effectMode === "spoiler");
+      bubble.appendChild(textNode);
     }
 
     row.appendChild(bubble);
