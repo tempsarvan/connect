@@ -12,8 +12,10 @@ import {
   toggleReaction, 
   sendTypingIndicator, 
   listenToTyping,
-  setUsername,
+  hasCompletedSetup,
+  saveUserSettings,
   getUsername,
+  getPassword,
   getSavedVaultMessages,
   saveMessageToVault,
   removeSavedMessageFromVault
@@ -79,7 +81,14 @@ async function init() {
     currentUid = getUserUid();
   }
 
-  updateProfileUI();
+  // Force First-Time Profile Onboarding Setup
+  if (!hasCompletedSetup()) {
+    showView("setup");
+  } else {
+    updateProfileUI();
+    showView("landing");
+  }
+
   initMediaPopovers(handleSendGif, handleSendSticker);
   initEmojiPanel(handleSelectEmoji);
   initDoodleStudio(handleSendDoodle);
@@ -91,12 +100,47 @@ async function init() {
 
 function updateProfileUI() {
   const uname = getUsername();
+  const pwd = getPassword();
   inputs.username.value = uname;
-  displays.landingUsernameLabel.textContent = uname === "Anonymous" ? "set username" : `@${uname}`;
+  if (inputs.password) inputs.password.value = pwd;
+  
+  displays.landingUsernameLabel.textContent = `@${uname}`;
   displays.chatHeaderUsername.textContent = uname;
 }
 
 function setupEventListeners() {
+  // First-Time Onboarding Completion
+  buttons.completeSetup.addEventListener("click", () => {
+    const uname = inputs.setupUsername.value.trim();
+    const pwd = inputs.setupPassword.value.trim();
+    const soundOn = inputs.setupSoundToggle.checked;
+
+    if (!uname) {
+      showToast("Please enter a username or handle");
+      return;
+    }
+    if (!pwd) {
+      showToast("Please set a private key / password");
+      return;
+    }
+
+    saveUserSettings(uname, pwd, soundOn);
+    updateProfileUI();
+    showToast(`Welcome @${uname}! Profile setup complete.`);
+    showView("landing");
+  });
+
+  // Top-Right Corner Settings Gear Buttons
+  buttons.gearLanding.addEventListener("click", () => {
+    closeAllPopovers();
+    displays.popoverProfile.classList.remove("hidden");
+  });
+
+  buttons.gearChat.addEventListener("click", () => {
+    closeAllPopovers();
+    displays.popoverProfile.classList.remove("hidden");
+  });
+
   // Navigation & Rooms
   buttons.create.addEventListener("click", handleCreateRoom);
   buttons.join.addEventListener("click", handleJoinRoom);
@@ -136,12 +180,13 @@ function setupEventListeners() {
   });
 
   buttons.saveProfile.addEventListener("click", () => {
-    const val = inputs.username.value.trim();
-    if (val) {
-      setUsername(val);
+    const uname = inputs.username.value.trim();
+    const pwd = inputs.password ? inputs.password.value.trim() : getPassword();
+    if (uname) {
+      saveUserSettings(uname, pwd, true);
       updateProfileUI();
       displays.popoverProfile.classList.add("hidden");
-      showToast(`Username updated to @${val}`);
+      showToast(`Settings updated for @${uname}`);
     }
   });
 

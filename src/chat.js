@@ -14,18 +14,41 @@ const typingUsers = new Set();
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
 
-// Persistent Local User Profile & Saved Vault Memory
-let currentUsername = localStorage.getItem("connect_username") || "Anonymous";
+// Persistent User Settings & System Memory (Username, Passcode PIN, Preferences)
+let currentUsername = localStorage.getItem("connect_username") || "";
+let currentPassword = localStorage.getItem("connect_password") || "";
+let isSoundEnabled = localStorage.getItem("connect_sound_enabled") !== "false";
+let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
 let savedVaultMessages = JSON.parse(localStorage.getItem("connect_saved_vault") || "[]");
 
-export function setUsername(name) {
+export function hasCompletedSetup() {
+  return isSetupCompleted && currentUsername.trim().length > 0;
+}
+
+export function saveUserSettings(name, password, soundOn = true) {
   currentUsername = name.trim() || "Anonymous";
+  currentPassword = password.trim();
+  isSoundEnabled = soundOn;
+  isSetupCompleted = true;
+
   localStorage.setItem("connect_username", currentUsername);
-  return currentUsername;
+  localStorage.setItem("connect_password", currentPassword);
+  localStorage.setItem("connect_sound_enabled", isSoundEnabled ? "true" : "false");
+  localStorage.setItem("connect_setup_completed", "true");
+
+  return { username: currentUsername, password: currentPassword, soundEnabled: isSoundEnabled };
 }
 
 export function getUsername() {
-  return currentUsername;
+  return currentUsername || "Anonymous";
+}
+
+export function getPassword() {
+  return currentPassword;
+}
+
+export function getSoundEnabled() {
+  return isSoundEnabled;
 }
 
 export function getSavedVaultMessages() {
@@ -81,7 +104,7 @@ export async function sendMessage(roomCode, uid, payload) {
   const fileName = typeof payload === "object" ? payload.fileName || null : null;
   const fileSize = typeof payload === "object" ? payload.fileSize || null : null;
   const soundFx = typeof payload === "object" ? payload.soundFx || null : null;
-  const senderName = currentUsername;
+  const senderName = getUsername();
 
   if (!text.trim() && !mediaUrl && !soundFx) return;
 

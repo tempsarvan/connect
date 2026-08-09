@@ -1,12 +1,16 @@
 import { STICKERS, TRENDING_GIFS, EMOJI_CATEGORIES } from "./media";
 
 export const views = {
+  setup: document.getElementById("view-setup"),
   landing: document.getElementById("view-landing"),
   waiting: document.getElementById("view-waiting"),
   chat: document.getElementById("view-chat")
 };
 
 export const buttons = {
+  completeSetup: document.getElementById("btn-complete-setup"),
+  gearLanding: document.getElementById("btn-gear-landing"),
+  gearChat: document.getElementById("btn-gear-chat"),
   create: document.getElementById("btn-create"),
   join: document.getElementById("btn-join"),
   copyCode: document.getElementById("btn-copy-code"),
@@ -50,9 +54,13 @@ export const buttons = {
 };
 
 export const inputs = {
+  setupUsername: document.getElementById("setup-username"),
+  setupPassword: document.getElementById("setup-password"),
+  setupSoundToggle: document.getElementById("setup-sound-toggle"),
   code: document.getElementById("input-code"),
   message: document.getElementById("input-message"),
   username: document.getElementById("input-username"),
+  password: document.getElementById("input-password"),
   photoUpload: document.getElementById("input-photo-upload"),
   fileUpload: document.getElementById("input-file-upload"),
   selectEffectMode: document.getElementById("select-effect-mode")
