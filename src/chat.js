@@ -231,6 +231,21 @@ export function removeFriend(friendHandle) {
   return friendsList;
 }
 
+let friendAliasesMap = JSON.parse(localStorage.getItem("connect_friend_aliases") || "{}");
+
+export function setFriendAlias(friendHandle, alias) {
+  if (alias && alias.trim()) {
+    friendAliasesMap[friendHandle.toLowerCase()] = alias.trim();
+  } else {
+    delete friendAliasesMap[friendHandle.toLowerCase()];
+  }
+  localStorage.setItem("connect_friend_aliases", JSON.stringify(friendAliasesMap));
+}
+
+export function getFriendAlias(friendHandle) {
+  return friendAliasesMap[friendHandle.toLowerCase()] || friendHandle;
+}
+
 // Room Invites Notification System
 export function initGlobalEvents(onNotification) {
   if (globalEventsChannel) globalEventsChannel.close();

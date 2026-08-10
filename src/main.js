@@ -26,7 +26,9 @@ import {
   sendRoomInvitation,
   getFriendKey,
   MAX_FILE_SIZE_BYTES,
-  formatFileSize
+  formatFileSize,
+  setFriendAlias,
+  getFriendAlias
 } from "./chat";
 import { 
   destroyRoomSession, 
@@ -67,13 +69,11 @@ let currentRoomCode = null;
 let isCurrentRoomPublic = false;
 let currentPublicRoomInfo = null;
 let currentRoomMembersList = [];
-let selectedRoomMode = "private";
 
 let currentUid = null;
 let roomUnsubscribe = null;
 let chatUnsubscribe = null;
 let currentAuthMode = "signup";
-let selectedBannerColor = getProfileBannerColor();
 let isRecordingVoice = false;
 let designCanvasControls = null;
 
@@ -91,6 +91,15 @@ async function init() {
     initThreeShowcase(displays.threeBgCanvas);
   }
 
+  // Load Saved Customize Connect Settings
+  const savedFont = localStorage.getItem("connect_custom_font") || "inter";
+  const savedGrayscale = localStorage.getItem("connect_custom_grayscale") || "obsidian";
+  document.body.dataset.font = savedFont;
+  document.body.dataset.grayscaleScheme = savedGrayscale;
+
+  if (inputs.settingSelectFont) inputs.settingSelectFont.value = savedFont;
+  if (inputs.settingSelectGrayscale) inputs.settingSelectGrayscale.value = savedGrayscale;
+
   // Auto-join via QR Code Scan Query URL Parameter e.g. ?join=X7K9P2
   const urlParams = new URLSearchParams(window.location.search);
   const qrJoinCode = urlParams.get("join") || urlParams.get("code");
@@ -103,8 +112,8 @@ async function init() {
       showToast(`Scanned QR Code! Auto-entering room [${qrJoinCode.toUpperCase()}]...`);
     }, 400);
   } else {
-    // Default directly to Connect Messenger Dashboard
-    showView("landing");
+    // Default Entrance to Showcase Landing Page
+    showView("showcase");
   }
 
   if (hasValidSession()) {
@@ -221,13 +230,6 @@ function updateSavedRoomsUI() {
 function openEditProfileStudio() {
   inputs.profileBioInput.value = getProfileBio();
   inputs.profileStatusInput.value = getCustomStatus();
-  selectedBannerColor = getProfileBannerColor();
-
-  document.querySelectorAll(".banner-swatch").forEach((swatch) => {
-    if (swatch.dataset.color === selectedBannerColor) swatch.classList.add("active");
-    else swatch.classList.remove("active");
-  });
-
   displays.modalEditProfile.classList.remove("hidden");
 }
 
@@ -239,7 +241,7 @@ function handleSaveProfileCustomization() {
   const bio = inputs.profileBioInput.value;
   const status = inputs.profileStatusInput.value;
 
-  saveProfileCustomization(bio, status, selectedBannerColor, "code");
+  saveProfileCustomization(bio, status, "#1e293b", "code");
   updateProfileUI();
   closeEditProfileStudio();
   showToast("Profile customization saved!");
@@ -260,6 +262,15 @@ function openInviteFriendsModal() {
   displays.modalInviteFriends.classList.remove("hidden");
 }
 
+function openFriendsSidebar() {
+  updateFriendsUI();
+  displays.sidebarFriendsDrawer?.classList.add("active");
+}
+
+function closeFriendsSidebar() {
+  displays.sidebarFriendsDrawer?.classList.remove("active");
+}
+
 function updateFriendsUI() {
   const friends = getFriends();
   renderFriendsList(
@@ -270,31 +281,43 @@ function updateFriendsUI() {
       showToast(`Removed ${friendHandle} from friends.`);
     },
     (friendHandle) => {
-      displays.modalFriendsList.classList.add("hidden");
-      selectedRoomMode = "private";
-      handleCreateRoomKey();
+      closeFriendsSidebar();
+      handleGenerateKey(false);
       showToast(`Starting private room key for ${friendHandle}...`);
     }
   );
 }
 
 function setupEventListeners() {
-  // Unified Room Key Generator Mode Toggle
-  buttons.modePrivate?.addEventListener("click", () => {
-    selectedRoomMode = "private";
-    buttons.modePrivate.classList.add("active");
-    buttons.modePublic.classList.remove("active");
-    document.getElementById("public-room-details-group")?.classList.add("hidden");
+  // Button-Triggered Key Type Selection Modal
+  buttons.openKeyModal?.addEventListener("click", () => {
+    document.getElementById("modal-public-inputs-group")?.classList.add("hidden");
+    displays.modalSelectKeyType?.classList.remove("hidden");
   });
 
-  buttons.modePublic?.addEventListener("click", () => {
-    selectedRoomMode = "public";
-    buttons.modePublic.classList.add("active");
-    buttons.modePrivate.classList.remove("active");
-    document.getElementById("public-room-details-group")?.classList.remove("hidden");
+  buttons.closeKeyModal?.addEventListener("click", () => {
+    displays.modalSelectKeyType?.classList.add("hidden");
   });
 
-  buttons.createRoomKey?.addEventListener("click", handleCreateRoomKey);
+  buttons.selectPrivateKey?.addEventListener("click", () => {
+    displays.modalSelectKeyType?.classList.add("hidden");
+    handleGenerateKey(false);
+  });
+
+  buttons.selectPublicKey?.addEventListener("click", () => {
+    document.getElementById("modal-public-inputs-group")?.classList.remove("hidden");
+  });
+
+  buttons.confirmPublicKey?.addEventListener("click", () => {
+    displays.modalSelectKeyType?.classList.add("hidden");
+    const pubName = inputs.modalPublicName?.value.trim() || null;
+    const pubTopic = inputs.modalPublicTopic?.value.trim() || null;
+    handleGenerateKey(true, pubName, pubTopic);
+  });
+
+  // Right Friends Sidebar Drawer
+  buttons.friendsDrawer?.addEventListener("click", openFriendsSidebar);
+  buttons.closeFriendsSidebar?.addEventListener("click", closeFriendsSidebar);
 
   // Connect Hub Desktop Launchers
   buttons.launchConnectHub?.addEventListener("click", () => {
@@ -384,10 +407,10 @@ function setupEventListeners() {
     const out = document.getElementById("dev-console-output");
     if (res.success) {
       out.textContent = `> Output: ${res.logs.join("\n") || res.result || "Executed cleanly"}`;
-      out.style.color = "#7ee787";
+      out.style.color = "#ffffff";
     } else {
       out.textContent = `> Error: ${res.error}`;
-      out.style.color = "#f85149";
+      out.style.color = "#ef4444";
     }
   });
 
@@ -517,28 +540,10 @@ function setupEventListeners() {
   buttons.closeEditProfile?.addEventListener("click", closeEditProfileStudio);
   buttons.saveProfileCustomization?.addEventListener("click", handleSaveProfileCustomization);
 
-  document.querySelectorAll(".banner-swatch").forEach((swatch) => {
-    swatch.addEventListener("click", () => {
-      document.querySelectorAll(".banner-swatch").forEach((s) => s.classList.remove("active"));
-      swatch.classList.add("active");
-      selectedBannerColor = swatch.dataset.color;
-    });
-  });
-
   // Room Invitations Handlers
   buttons.inviteFriendsWaiting?.addEventListener("click", openInviteFriendsModal);
   buttons.inviteFriendsChat?.addEventListener("click", openInviteFriendsModal);
   buttons.closeInviteFriends?.addEventListener("click", () => displays.modalInviteFriends.classList.add("hidden"));
-
-  // Friends List Drawer Handlers
-  buttons.friendsDrawer?.addEventListener("click", () => {
-    updateFriendsUI();
-    displays.modalFriendsList.classList.remove("hidden");
-  });
-
-  buttons.closeFriendsModal?.addEventListener("click", () => {
-    displays.modalFriendsList.classList.add("hidden");
-  });
 
   buttons.addFriendSubmit?.addEventListener("click", () => {
     const handleOrKey = inputs.addFriendHandle.value.trim();
@@ -579,7 +584,7 @@ function setupEventListeners() {
   buttons.profileLanding?.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
   buttons.profileHeader?.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
 
-  // Settings
+  // Settings & Customize Connect Options
   buttons.gearLanding?.addEventListener("click", openFullscreenSettings);
   buttons.gearChat?.addEventListener("click", openFullscreenSettings);
   buttons.closeFullscreenSettings?.addEventListener("click", closeFullscreenSettings);
@@ -626,6 +631,8 @@ function closeFullscreenSettings() {
 function handleSaveSettings() {
   const uname = inputs.settingUsername.value.trim();
   const pwd = inputs.settingPassword.value.trim();
+  const font = inputs.settingSelectFont?.value || "inter";
+  const grayscale = inputs.settingSelectGrayscale?.value || "obsidian";
 
   if (!uname) {
     showToast("Please enter a valid username");
@@ -634,9 +641,16 @@ function handleSaveSettings() {
 
   try {
     saveUserSettings(uname, pwd, true, true, currentUid);
+
+    // Apply Customize Connect font & theme
+    document.body.dataset.font = font;
+    document.body.dataset.grayscaleScheme = grayscale;
+    localStorage.setItem("connect_custom_font", font);
+    localStorage.setItem("connect_custom_grayscale", grayscale);
+
     updateProfileUI();
     closeFullscreenSettings();
-    showToast("Settings applied & saved");
+    showToast("Customize Connect settings saved!");
   } catch (err) {
     showToast(err.message);
   }
@@ -715,20 +729,16 @@ async function handleFileUpload(e, targetRoomId) {
   }
 }
 
-async function handleCreateRoomKey() {
+async function handleGenerateKey(isPublic = false, pubName = null, pubTopic = null) {
   if (!currentUid) currentUid = getUserUid();
 
-  const isPublic = selectedRoomMode === "public";
   const roomCode = generateRoomCode();
   isCurrentRoomPublic = isPublic;
   
   if (isPublic) {
-    const nameInput = document.getElementById("input-public-name-dash");
-    const topicInput = document.getElementById("input-public-topic-dash");
-
     currentPublicRoomInfo = {
-      name: nameInput?.value.trim() || `Public Room ${roomCode}`,
-      topic: topicInput?.value.trim() || "Persistent community space"
+      name: pubName || `Public Room ${roomCode}`,
+      topic: pubTopic || "Persistent community space"
     };
     savePublicRoomToHub(roomCode, currentPublicRoomInfo.name, currentPublicRoomInfo.topic);
   } else {
