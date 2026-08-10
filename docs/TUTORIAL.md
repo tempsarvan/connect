@@ -1,79 +1,68 @@
 # Connect & Connect Hub — Step-by-Step User Tutorial
 
-Welcome to **Connect** and **Connect Hub Web Desktop OS**. This guide walks you through every feature of the platform.
+Welcome to **Connect** and **Connect Hub Web Desktop OS**. This tutorial walks you through every feature of the platform.
 
 ---
 
-## 🔑 1. Creating & Joining Room Keys
+## 🚀 1. Showcase Landing Page Entrance
 
-### Creating a Room Key
-1. Navigate to Connect Messenger Dashboard.
-2. Select your room mode:
-   - **🔒 Ephemeral Private Key**: Single-use 6-digit key. All messages and memory self-destruct upon session termination.
-   - **🌐 Persistent Public Key**: Community room code that saves to your **Public Rooms Hub**.
-3. Click **Create Room Key**.
-4. You will enter the **2-Way Room Key Waiting Screen** displaying your 6-digit key.
-
-### 2-Way Room Key Handshake
-1. Click **Copy Key** to copy the 6-digit key to your clipboard, or click **Invite Friends** to send an instant room invitation.
-2. The waiting screen displays: `"Waiting for 2-way peer registration with room key..."`.
-3. When your peer enters the 6-digit key on their device, both devices register the handshake and unlock the encrypted chat room together!
-4. Alternatively, click **Launch Chat Session** for instant solo access.
+When you first open Connect, you are welcomed by the **Showcase Landing Page** (`view-showcase`):
+- **Three.js 3D Background Canvas**: Interactive particle backdrop.
+- **Hero Section**: Key product metrics and *"Talk freely. Leave no trace."* introduction.
+- **Guided Tour & Live Change Log**: Explore live platform releases and feature cards.
+- **Navigation**: Click **Enter Connect Messenger** or **Launch Messenger** to move into the room dashboard.
 
 ---
 
-## 💻 2. Using Connect Hub Web Desktop Platform
+## 🔑 2. Creating Room Keys via Key Type Selection Modal
+
+1. On the Connect Messenger Dashboard, click the **Create Room Key** button.
+2. The **Key Type Selection Modal** (`#modal-select-key-type`) pops up:
+   - **🔒 Ephemeral Private Key**: Generates a single-use 6-digit zero-trace room key. All messages and memory self-destruct upon session exit.
+   - **🌐 Persistent Public Key**: Generates a 6-digit key with Room Name and Topic inputs. Saved to your **Public Rooms Hub** for future sessions.
+3. Select your desired key type to enter the **2-Way Room Key Waiting View**.
+
+---
+
+## 📱 3. Smooth Sliding Right Friends Sidebar Drawer
+
+Click the **Friends** button in the top navigation bar:
+- The **Right Friends Sidebar Drawer** (`#sidebar-friends-drawer`) slides smoothly from the right with glassmorphism backdrop.
+- **Connected Friends**: Displays real active friends from your connection list along with their permanent Friend Keys (`CN-9X4A-82`).
+- **Add Friend**: Enter a handle (e.g. `@alex`) or Friend Key to add them.
+- **Instant Room Invite**: Tap **Private Chat** or **Invite** to send room keys instantly to your connected friends.
+
+---
+
+## 💻 4. Using Connect Hub Web Desktop Platform
 
 **Connect Hub** is an interactive Web Desktop OS environment running natively inside your browser.
 
 ### Launching Connect Hub Desktop
-- Click **Connect Hub** in the top navigation bar, OR click **Move to Connect Hub** in an active chat header.
-- The desktop opens with macOS-style glass bar, live clock, desktop workspace, and bottom app dock.
+- Click **Connect Hub** in the top bar, OR click **Move to Connect Hub** in an active chat header.
 
-### Floating App Windows
-Connect Hub allows opening and running multiple native web app windows side-by-side:
-- 💬 **Connect Messages**: Synced real-time encrypted room stream.
-- 📷 **Instagram**: Embedded Instagram web app.
-- 👾 **Discord**: Embedded Discord web application.
-- ▶️ **YouTube**: Embedded YouTube video player.
-- 🐦 **X (Twitter)**: Embedded X Twitter web app.
-- 🐙 **GitHub**: Embedded developer workspace.
-- 🎵 **Spotify**: Embedded music player.
-- 🎨 **Drawing Whiteboard**: Interactive drawing canvas.
-- 💻 **IDE Console**: Live JavaScript code evaluator.
+### Desktop Boot Behavior
+- **Connect Messages App**: Opens automatically on boot, displaying your synced real-time encrypted room conversation!
+- **Other Desktop Apps**: Closed by default (`hidden`). Click any dock icon to launch:
+  - 📷 **Instagram**: Embedded Instagram web app.
+  - 👾 **Discord**: Embedded Discord web application.
+  - ▶️ **YouTube**: Embedded YouTube video player.
+  - 🐦 **X (Twitter)**: Embedded X Twitter web app.
+  - 🐙 **GitHub**: Embedded developer workspace.
+  - 🎵 **Spotify**: Embedded music player.
+  - 🎨 **Drawing Whiteboard**: Interactive drawing canvas.
+  - 💻 **IDE Console**: Live JavaScript code evaluator.
 
 ### Window Controls
-- **Drag Window**: Click and drag any window titlebar to position it anywhere on your desktop.
-- **Close / Minimize / Maximize**: Click the red, yellow, or green window control buttons.
-- **Focus**: Click inside any app window to bring it to the front.
+- **Drag**: Click and drag any window titlebar to position it anywhere on your desktop.
+- **Close**: Click the red window button (`win-btn-close`) to close the window immediately.
 
 ---
 
-## 🎨 3. Expression Tools: Whiteboard Canvas & IDE Console
+## ⚙️ 5. Customize Connect Settings
 
-In the chat interface, tap the **`+` Attachment & Expression Tools** button:
-
-1. **Drawing Whiteboard Canvas**:
-   - Select color swatches (`#3b82f6`, `#f472b6`, `#10b981`, `#f59e0b`, `#8b5cf6`, `#ffffff`).
-   - Draw diagrams or sketches.
-   - Click **Share in Chat** to publish your sketch as a photo attachment.
-
-2. **IDE Code Evaluator Console**:
-   - Type or paste JavaScript code.
-   - Click **Run Code Snippet** to execute client-side in real-time.
-   - Click **Share Code in Chat** to format and post the syntax block to your room stream.
-
-3. **Voice Notes Studio**:
-   - Tap **Record Voice Note**.
-   - Speak into your device microphone.
-   - Tap again to stop and send high-fidelity audio notes.
-
-4. **1 Terabyte File Attachments**:
-   - Attach documents, photos, or archives up to 1 TB.
-
----
-
-## 🔒 4. Security & Panic Wipe
-
-- **AES-GCM 256-Bit Cryptography**: All text, media, and voice payloads are encrypted client-side using Web Crypto API.
-- **1-Click Panic Wipe**: Open **Settings** (gear icon) -> click **1-Click Panic Wipe** to zero out all local storage, cookies, and tokens immediately.
+Open **Settings** (gear icon) -> **CUSTOMIZE CONNECT**:
+1. **UI Typography Font**: Choose your preferred typography (`Inter`, `JetBrains Mono`, `System Sans`).
+2. **Cold Obsidian Grayscale Palette**: Choose your grayscale scheme (`Cold Obsidian Dark Slate`, `Pure Deep Monochrome Black`, `Cold Cyber Charcoal`).
+3. **Friend Display Name Aliases**: Create custom display names for your friends in your database.
+4. **1-Click Panic Wipe**: Zero out all local storage, cookies, and tokens immediately.

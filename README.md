@@ -1,14 +1,14 @@
 <div align="center">
   <img src="public/logo.svg" width="100" height="100" alt="Connect Official Logo" />
   <h1>Connect & Connect Hub</h1>
-  <p><strong>Zero-Trace Ephemeral Private Messaging, AES-GCM 256-Bit Cryptography & Web Desktop OS Platform</strong></p>
+  <p><strong>Zero-Trace Ephemeral Private Messaging, Cold Obsidian Grayscale Noise & Web Desktop OS Platform</strong></p>
 
   <p>
-    <a href="https://github.com/tempsarvan/connect"><img src="https://img.shields.io/badge/version-v3.0.0-blue.svg?style=flat-square" alt="Version"></a>
+    <a href="https://github.com/tempsarvan/connect"><img src="https://img.shields.io/badge/version-v3.1.0-blue.svg?style=flat-square" alt="Version"></a>
     <a href="#"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat-square" alt="License"></a>
     <a href="#"><img src="https://img.shields.io/badge/status-active--live-brightgreen.svg?style=flat-square" alt="Status"></a>
     <a href="#"><img src="https://img.shields.io/badge/encryption-AES--GCM--256--bit-purple.svg?style=flat-square" alt="Encryption"></a>
-    <a href="#"><img src="https://img.shields.io/badge/attachments-1%20TB%20max-orange.svg?style=flat-square" alt="Max Attachments"></a>
+    <a href="#"><img src="https://img.shields.io/badge/theme-obsidian%20grayscale-black.svg?style=flat-square" alt="Theme"></a>
   </p>
 
   <br />
@@ -18,7 +18,7 @@
 
 ## 📖 Overview
 
-**Connect** is an ultra-premium, privacy-first real-time messaging suite and Web Desktop OS platform. It features **AES-GCM 256-bit client-side cryptography**, **2-way room key registration handshakes**, **Connect Hub Web Desktop platform** with draggable floating app windows, **zero-emoji vector iconography**, **Voice Notes Studio**, **Collaborative Whiteboard Canvas**, **IDE Code Evaluator Console**, and **1 Terabyte file support**.
+**Connect** is an ultra-premium, privacy-first real-time messaging suite and Web Desktop OS platform. Engineered with **Cold Obsidian Grayscale Noise aesthetics**, **Showcase Landing Page initial entrance**, **button-triggered Key Selection Modal**, **AES-GCM 256-bit client-side cryptography**, **2-way room key registration handshakes**, **Connect Hub Web Desktop platform** with floating app windows, **smooth sliding Right Friends Sidebar Drawer**, **Voice Notes Studio**, **Collaborative Whiteboard Canvas**, **IDE Code Evaluator Console**, and **1 Terabyte file support**.
 
 ---
 
@@ -26,16 +26,16 @@
 
 | Feature | Description |
 |---|---|
+| 🖤 **Cold Obsidian Grayscale Aesthetics** | Pure monochrome grays, silvers, and dark cold obsidian noise gradients with subtle CSS texture overlay. |
+| 🚀 **Showcase Landing Page Entrance** | Initial boot view (`view-showcase`) featuring Three.js 3D background, hero section, metrics bar, guided tour grid, and live change log. |
+| 🔑 **Button-Triggered Key Selection Modal** | Click Create Key button to select **[ 🔒 Ephemeral Private Key ]** vs **[ 🌐 Persistent Public Key ]** in a clean modal. |
+| 📱 **Smooth Sliding Right Friends Sidebar** | Right sliding glass drawer (`#sidebar-friends-drawer`) listing real connected users, Friend Keys, and display name aliases. |
+| 💻 **Connect Hub Web Desktop OS** | Interactive Web Desktop OS environment (`view-connect-hub`) featuring floating native app windows (Connect Messages open on boot; Instagram, Discord, YouTube, X, GitHub, Spotify, Whiteboard Canvas, IDE Console open on demand). |
+| ⚙️ **Customize Connect Settings Section** | Customize UI typography fonts (`Inter`, `JetBrains Mono`, `System Sans`), grayscale palettes, credentials, and friend display name aliases. |
 | 🔐 **AES-GCM 256-Bit Encryption** | Web Crypto API client-side payload encryption for messages, voice notes, and media uploads. |
-| 💻 **Connect Hub Web Desktop OS** | Interactive Web Desktop OS environment (`view-connect-hub`) featuring floating native app windows (Connect Messages, Instagram, Discord, YouTube, X, GitHub, Spotify, Whiteboard Canvas, IDE Console). |
-| 🔑 **2-Way Room Key Handshake** | Unified Private vs Public Room Key generator holding entrance in a 6-digit key waiting room until both peers register with the key. |
 | 🎨 **Collaborative Whiteboard Canvas** | Built-in interactive drawing canvas tool with color palette swatches, stroke controls, and 1-click share to room stream. |
 | 💻 **IDE Code Evaluator Console** | Real-time JavaScript code evaluator with console logging and snippet sharing. |
-| 🎙️ **Audio & Voice Notes Studio** | Microphone voice recorder with high-fidelity Web Audio API encoding. |
 | 📁 **1 Terabyte (1 TB) Uploads** | Attach high-definition media, code archives, or massive documents up to 1 TB. |
-| 🔑 **Unique Friend Keys & Handles** | Permanent 8-character Friend Keys (e.g. `CN-9X4A-82`) and globally unique locked handles. |
-| 🔒 **Panic Wipe & Security Vault** | 1-click **Panic Wipe** button to instantly zero out local storage, cookies, and session memory. |
-| 🎯 **Zero Emoji Minimal Vector UI** | Complete vector SVG icon design system across all headers, drawers, buttons, and notifications. |
 
 ---
 
@@ -65,7 +65,7 @@ connect/
 │   ├── sound.js            # High-fidelity Web Audio synth sound engine
 │   └── ui.js               # UI view management, DOM bindings & notifications
 ├── styles/
-│   ├── main.css            # Connect Hub OS layout, glassmorphism & themes
+│   ├── main.css            # Cold Obsidian Grayscale layout, noise texture & themes
 │   ├── reset.css           # Modern CSS reset
 │   └── tokens.css          # Design system CSS variables & tokens
 ├── index.html              # Single-page shell with Connect Messenger & Connect Hub Desktop

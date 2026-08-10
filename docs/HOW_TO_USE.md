@@ -1,6 +1,6 @@
 # Connect & Connect Hub — Detailed Feature & Security Usage Guide
 
-This guide covers advanced usage, cryptographic details, friend connections, device pairing, and platform settings.
+This guide covers advanced usage, cryptographic details, friend connections, device pairing, and platform customization settings.
 
 ---
 
@@ -18,19 +18,24 @@ Connect implements zero-trust, client-side encryption using the **Web Crypto API
 
 ---
 
-## 📱 2. Friend Keys & Handles
+## 🖤 2. Cold Obsidian Grayscale Aesthetic Engine
 
-- **Unique Handle**: When signing up, claim your locked handle (e.g. `@sarvan`). Handles are globally unique.
-- **Unique Friend Key**: Your account receives an 8-character permanent Friend Key (e.g. `CN-9X4A-82`).
-- **Adding Friends**:
-  - Open the **Friends** drawer.
-  - Enter your friend's Handle or Friend Key.
-  - Click **Add Friend** to save them to your connections list.
-  - Tap **Invite** in any room to send instant 6-digit room keys to your friends.
+- **Pure Monochrome Palette**: Clean whites (`#ffffff`), silvers (`#e2e8f0`), and slate grays (`#94a3b8`) on dark cold obsidian gradients (`#090a0f`, `#0d0f14`, `#050608`).
+- **Subtle CSS Noise Texture**: Ambient radial noise overlay rendering subtle grain depth without clutter.
+- **Glassmorphism**: Backdrop blur filters (`backdrop-filter: blur(32px)`) across all modals, drawers, and titlebars.
 
 ---
 
-## 📱 3. Device QR Code Pairing
+## 📱 3. Friend Keys, Display Name Aliases & Sidebar Drawer
+
+- **Unique Handle**: When signing up, claim your locked handle (e.g. `@sarvan`).
+- **Unique Friend Key**: Your account receives an 8-character permanent Friend Key (e.g. `CN-9X4A-82`).
+- **Right Friends Sidebar Drawer**: Tap **Friends** to slide open the right sidebar drawer (`#sidebar-friends-drawer`).
+- **Friend Aliases**: Create custom display names for friends in your connection database via Customize Connect settings.
+
+---
+
+## 📱 4. Device QR Code Pairing
 
 To pair your mobile device or tablet with a desktop chat session:
 1. Open Connect on your desktop.
@@ -39,8 +44,8 @@ To pair your mobile device or tablet with a desktop chat session:
 
 ---
 
-## ⚙️ 4. Profile & Vault Settings
+## ⚙️ 5. Customize Connect & Security Vault
 
-- **Customize Profile**: Update your bio, status message, banner color accent, and avatar icon.
+- **Customize Connect**: Configure UI font typography (`Inter`, `JetBrains Mono`, `System Sans`), grayscale themes, credentials, and friend display names.
 - **Export Vault Backup**: Download an encrypted local backup of your profile credentials and saved rooms.
 - **1-Click Panic Wipe**: Instantly purges all browser memory, local storage keys, session tokens, and cached messages.
