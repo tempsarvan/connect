@@ -1,10 +1,10 @@
 <div align="center">
   <img src="public/logo.svg" width="100" height="100" alt="Connect Official Logo" />
   <h1>Connect & Connect Hub</h1>
-  <p><strong>Zero-Trace Ephemeral Private Messaging, Cold Obsidian Grayscale Noise & Web Desktop OS Platform</strong></p>
+  <p><strong>Zero-Trace Ephemeral Private Messaging, Cold Obsidian Grayscale & Web Desktop OS Platform</strong></p>
 
   <p>
-    <a href="https://github.com/tempsarvan/connect"><img src="https://img.shields.io/badge/version-v3.1.0-blue.svg?style=flat-square" alt="Version"></a>
+    <a href="https://github.com/tempsarvan/connect"><img src="https://img.shields.io/badge/version-v3.2.0-blue.svg?style=flat-square" alt="Version"></a>
     <a href="#"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat-square" alt="License"></a>
     <a href="#"><img src="https://img.shields.io/badge/status-active--live-brightgreen.svg?style=flat-square" alt="Status"></a>
     <a href="#"><img src="https://img.shields.io/badge/encryption-AES--GCM--256--bit-purple.svg?style=flat-square" alt="Encryption"></a>
@@ -18,7 +18,7 @@
 
 ## 📖 Overview
 
-**Connect** is an ultra-premium, privacy-first real-time messaging suite and Web Desktop OS platform. Engineered with **Cold Obsidian Grayscale Noise aesthetics**, **Showcase Landing Page initial entrance**, **button-triggered Key Selection Modal**, **AES-GCM 256-bit client-side cryptography**, **2-way room key registration handshakes**, **Connect Hub Web Desktop platform** with floating app windows, **smooth sliding Right Friends Sidebar Drawer**, **Voice Notes Studio**, **Collaborative Whiteboard Canvas**, **IDE Code Evaluator Console**, and **1 Terabyte file support**.
+**Connect** is a state-of-the-art hybrid communications suite and Web Desktop OS platform. Engineered with **Cold Obsidian Grayscale Noise aesthetics**, **Showcase Landing Page initial entrance**, **Key Type Selection Modal (Private Key vs Public Key)**, **native zero-block Connect Hub web desktop apps**, **full Expression Dropdown tools (Stickers, GIFs, Whiteboard Canvas, IDE Console, Voice Notes, Photos, 1 TB Files)**, **AES-GCM 256-bit encryption**, and **smooth sliding Right Friends Sidebar Drawer**.
 
 ---
 
@@ -28,13 +28,12 @@
 |---|---|
 | 🖤 **Cold Obsidian Grayscale Aesthetics** | Pure monochrome grays, silvers, and dark cold obsidian noise gradients with subtle CSS texture overlay. |
 | 🚀 **Showcase Landing Page Entrance** | Initial boot view (`view-showcase`) featuring Three.js 3D background, hero section, metrics bar, guided tour grid, and live change log. |
-| 🔑 **Button-Triggered Key Selection Modal** | Click Create Key button to select **[ 🔒 Ephemeral Private Key ]** vs **[ 🌐 Persistent Public Key ]** in a clean modal. |
+| 🔑 **Clean Key Naming (Private Key / Public Key)** | Click Create Key button to select **Private Key** (ephemeral zero-trace) vs **Public Key** (persistent saved hub). |
+| 🎨 **Full Expression & Attachment Tools Menu** | Upward `+` dropdown menu containing Whiteboard Canvas, IDE Console, Voice Notes, Photo Attachments, 1 TB Files, Stickers Picker, and GIFs Picker. |
+| 💻 **Connect Hub Web Desktop Native Apps** | Interactive Web Desktop OS (`view-connect-hub`) with zero-block native client app windows for Instagram, Discord, YouTube, X, GitHub, Spotify, Whiteboard Canvas, and IDE Console. |
 | 📱 **Smooth Sliding Right Friends Sidebar** | Right sliding glass drawer (`#sidebar-friends-drawer`) listing real connected users, Friend Keys, and display name aliases. |
-| 💻 **Connect Hub Web Desktop OS** | Interactive Web Desktop OS environment (`view-connect-hub`) featuring floating native app windows (Connect Messages open on boot; Instagram, Discord, YouTube, X, GitHub, Spotify, Whiteboard Canvas, IDE Console open on demand). |
 | ⚙️ **Customize Connect Settings Section** | Customize UI typography fonts (`Inter`, `JetBrains Mono`, `System Sans`), grayscale palettes, credentials, and friend display name aliases. |
 | 🔐 **AES-GCM 256-Bit Encryption** | Web Crypto API client-side payload encryption for messages, voice notes, and media uploads. |
-| 🎨 **Collaborative Whiteboard Canvas** | Built-in interactive drawing canvas tool with color palette swatches, stroke controls, and 1-click share to room stream. |
-| 💻 **IDE Code Evaluator Console** | Real-time JavaScript code evaluator with console logging and snippet sharing. |
 | 📁 **1 Terabyte (1 TB) Uploads** | Attach high-definition media, code archives, or massive documents up to 1 TB. |
 
 ---
@@ -44,8 +43,8 @@
 ```text
 connect/
 ├── docs/
-│   ├── TUTORIAL.md         # Comprehensive step-by-step user tutorial
-│   └── HOW_TO_USE.md       # Detailed feature & security usage guide
+│   ├── TUTORIAL.md         # Step-by-step user tutorial
+│   └── HOW_TO_USE.md       # Feature & security usage guide
 ├── public/
 │   └── logo.svg            # Official C-tick vector SVG logo & favicon
 ├── src/

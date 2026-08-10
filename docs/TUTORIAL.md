@@ -14,55 +14,51 @@ When you first open Connect, you are welcomed by the **Showcase Landing Page** (
 
 ---
 
-## 🔑 2. Creating Room Keys via Key Type Selection Modal
+## 🔑 2. Creating Room Keys (Private Key vs Public Key)
 
 1. On the Connect Messenger Dashboard, click the **Create Room Key** button.
 2. The **Key Type Selection Modal** (`#modal-select-key-type`) pops up:
-   - **🔒 Ephemeral Private Key**: Generates a single-use 6-digit zero-trace room key. All messages and memory self-destruct upon session exit.
-   - **🌐 Persistent Public Key**: Generates a 6-digit key with Room Name and Topic inputs. Saved to your **Public Rooms Hub** for future sessions.
-3. Select your desired key type to enter the **2-Way Room Key Waiting View**.
+   - **Private Key**: Generates a single-use 6-digit zero-trace room key. All messages and memory self-destruct upon session exit.
+   - **Public Key**: Generates a 6-digit key with Room Name and Topic inputs. Saved to your **Public Rooms Hub** for future sessions.
+3. Select your key type to enter the **2-Way Room Key Waiting View**.
 
 ---
 
-## 📱 3. Smooth Sliding Right Friends Sidebar Drawer
+## 🎨 3. Using Full Expression & Attachment Tools Menu
 
-Click the **Friends** button in the top navigation bar:
-- The **Right Friends Sidebar Drawer** (`#sidebar-friends-drawer`) slides smoothly from the right with glassmorphism backdrop.
-- **Connected Friends**: Displays real active friends from your connection list along with their permanent Friend Keys (`CN-9X4A-82`).
-- **Add Friend**: Enter a handle (e.g. `@alex`) or Friend Key to add them.
-- **Instant Room Invite**: Tap **Private Chat** or **Invite** to send room keys instantly to your connected friends.
+Tap the `+` button in the chat input bar to open the upward **Expression Tools Menu**:
+1. 🎨 **Drawing Whiteboard Canvas**: Sketch illustrations and click **Share in Chat**.
+2. 💻 **IDE Code Evaluator Console**: Write, test, and execute JavaScript code snippets.
+3. 🎙️ **Record Voice Note**: Tap to record high-fidelity voice notes.
+4. 📷 **Send Image / Photo**: Upload and share images.
+5. 📁 **Send Document (Up to 1 TB)**: Attach massive files up to 1 Terabyte.
+6. 🖼️ **Send Vector Sticker**: Open the Stickers Picker modal and select vector stickers.
+7. 🎬 **Send Animated GIF**: Open the GIFs Picker modal and select animated GIFs.
 
 ---
 
-## 💻 4. Using Connect Hub Web Desktop Platform
+## 💻 4. Using Connect Hub Web Desktop Native Apps
 
 **Connect Hub** is an interactive Web Desktop OS environment running natively inside your browser.
 
 ### Launching Connect Hub Desktop
 - Click **Connect Hub** in the top bar, OR click **Move to Connect Hub** in an active chat header.
 
-### Desktop Boot Behavior
+### Native Zero-Block Web Apps
 - **Connect Messages App**: Opens automatically on boot, displaying your synced real-time encrypted room conversation!
 - **Other Desktop Apps**: Closed by default (`hidden`). Click any dock icon to launch:
-  - 📷 **Instagram**: Embedded Instagram web app.
-  - 👾 **Discord**: Embedded Discord web application.
-  - ▶️ **YouTube**: Embedded YouTube video player.
-  - 🐦 **X (Twitter)**: Embedded X Twitter web app.
-  - 🐙 **GitHub**: Embedded developer workspace.
-  - 🎵 **Spotify**: Embedded music player.
+  - 📷 **Instagram Web Client**: Native feed client view.
+  - 👾 **Discord Web Client**: Native channel chat client view.
+  - ▶️ **YouTube Player**: Native video player embed.
+  - 🐦 **X (Twitter) Client**: Native feed client view.
+  - 🐙 **GitHub Repository**: Native code repository browser.
+  - 🎵 **Spotify Player**: Native music player embed.
   - 🎨 **Drawing Whiteboard**: Interactive drawing canvas.
   - 💻 **IDE Console**: Live JavaScript code evaluator.
 
-### Window Controls
-- **Drag**: Click and drag any window titlebar to position it anywhere on your desktop.
-- **Close**: Click the red window button (`win-btn-close`) to close the window immediately.
-
 ---
 
-## ⚙️ 5. Customize Connect Settings
+## 🚪 5. Exit Session & Session Destruction
 
-Open **Settings** (gear icon) -> **CUSTOMIZE CONNECT**:
-1. **UI Typography Font**: Choose your preferred typography (`Inter`, `JetBrains Mono`, `System Sans`).
-2. **Cold Obsidian Grayscale Palette**: Choose your grayscale scheme (`Cold Obsidian Dark Slate`, `Pure Deep Monochrome Black`, `Cold Cyber Charcoal`).
-3. **Friend Display Name Aliases**: Create custom display names for your friends in your database.
-4. **1-Click Panic Wipe**: Zero out all local storage, cookies, and tokens immediately.
+- Tap the **Exit** button in the chat header at any time.
+- Clicking **Exit** immediately unsubscribes from signaling channels, destroys ephemeral room session memory, and displays the disconnected exit screen or returns home cleanly.
