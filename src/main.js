@@ -622,13 +622,24 @@ function setupEventListeners() {
   });
 
   // Hub Messages send handler
-  document.getElementById("hub-btn-send")?.addEventListener("click", async () => {
+  const handleHubSend = async () => {
     const input = document.getElementById("hub-input-message");
-    const text = input.value.trim();
-    if (text && currentRoomCode) {
+    const text = input ? input.value.trim() : "";
+    if (text) {
+      if (!currentRoomCode) {
+        await handleGenerateKey(false);
+      }
       input.value = "";
       await sendMessage(currentRoomCode, currentUid, { text, mediaType: "text" });
       soundEngine.playMessageDing();
+    }
+  };
+
+  document.getElementById("hub-btn-send")?.addEventListener("click", handleHubSend);
+  document.getElementById("hub-input-message")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleHubSend();
     }
   });
 

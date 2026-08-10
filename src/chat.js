@@ -1,80 +1,38 @@
-// Zero-Permission Universal Chat Bus for Connect with WhatsApp-Grade Reactions & Triple-Redundant Transport
+// Zero-Trace Client-Side AES-GCM Encrypted Chat & Triple-Transport Relay System
+
 import { encryptPayload, decryptPayload } from "./cryptoEngine";
 
-let roomChannel = null;
-let globalEventsChannel = null;
+export const MAX_FILE_SIZE_BYTES = 1000 * 1024 * 1024 * 1024; // 1 Terabyte (1 TB)
+
 const messageStore = new Map();
 const typingUsers = new Map();
-let typingListeners = new Set();
-let onMessagesUpdatedCallback = null;
+const friendAliasesMap = JSON.parse(localStorage.getItem("connect_friend_aliases") || '{}');
 
-// Persistent Device Session (3 Days Inactivity Expiry Threshold)
-const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
+let currentUsername = localStorage.getItem("connect_user_handle") || "@anonymous";
+let currentPassword = localStorage.getItem("connect_user_passcode") || "";
+let isSetupCompleted = localStorage.getItem("connect_setup_done") === "true";
+let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_timestamp") || "0", 10);
+let friendKey = localStorage.getItem("connect_friend_key") || generateFriendKey();
 
-// Maximum File Size Limit: 1 Terabyte (1 TB / 1,000 GB)
-export const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
-
-let currentUsername = localStorage.getItem("connect_username") || "";
-let currentPassword = localStorage.getItem("connect_password") || "";
 let profileBio = localStorage.getItem("connect_profile_bio") || "Exploring Connect zero-trace communications suite.";
 let customStatus = localStorage.getItem("connect_custom_status") || "Online & Connected";
-let profileBannerColor = localStorage.getItem("connect_profile_banner") || "#3b82f6";
-let profileAvatarIcon = localStorage.getItem("connect_avatar_icon") || "code";
+let profileBannerColor = localStorage.getItem("connect_profile_banner") || "#1e293b";
+let profileBadgeStyle = localStorage.getItem("connect_profile_badge") || "code";
 
-// Generate or load permanent 8-character Unique Friend Key (e.g. CN-9X4A-82)
-let friendKey = localStorage.getItem("connect_friend_key") || "";
-if (!friendKey) {
-  const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let r1 = "", r2 = "";
-  for (let i = 0; i < 4; i++) r1 += chars.charAt(Math.floor(Math.random() * chars.length));
-  for (let i = 0; i < 2; i++) r2 += Math.floor(Math.random() * 10);
-  friendKey = `CN-${r1}-${r2}`;
-  localStorage.setItem("connect_friend_key", friendKey);
-}
-
-let isSoundEnabled = localStorage.getItem("connect_sound_enabled") !== "false";
-let isVaultEnabled = localStorage.getItem("connect_vault_enabled") !== "false";
-let isSetupCompleted = localStorage.getItem("connect_setup_completed") === "true";
-let lastActiveTimestamp = parseInt(localStorage.getItem("connect_last_active_timestamp") || "0", 10);
-
-// Real User Friends List
-let friendsList = JSON.parse(localStorage.getItem("connect_friends_list") || '[]');
-
-// Persistent Saved Public Rooms Section (Dynamic Expanding Array)
+let connectedFriends = JSON.parse(localStorage.getItem("connect_friends_list") || '[]');
 let savedPublicRooms = JSON.parse(localStorage.getItem("connect_saved_public_rooms") || '[]');
 
-export function getSavedPublicRooms() {
-  return savedPublicRooms;
-}
+let onMessagesUpdatedCallback = null;
+let roomChannel = null;
+let globalEventsChannel = null;
+let typingListeners = new Set();
 
-export function savePublicRoomToHub(roomCode, roomName = null, topic = null) {
-  const code = roomCode.toUpperCase();
-  const existingIdx = savedPublicRooms.findIndex((r) => r.code === code);
-  
-  const name = roomName || `Public Room ${code}`;
-  const roomTopic = topic || "Persistent community space";
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 Hours
 
-  const roomObj = {
-    code,
-    name,
-    topic: roomTopic,
-    lastVisitedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  };
-
-  if (existingIdx >= 0) {
-    savedPublicRooms[existingIdx] = roomObj;
-  } else {
-    savedPublicRooms.unshift(roomObj);
-  }
-
-  localStorage.setItem("connect_saved_public_rooms", JSON.stringify(savedPublicRooms));
-  return savedPublicRooms;
-}
-
-export function removeSavedPublicRoom(roomCode) {
-  savedPublicRooms = savedPublicRooms.filter((r) => r.code !== roomCode.toUpperCase());
-  localStorage.setItem("connect_saved_public_rooms", JSON.stringify(savedPublicRooms));
-  return savedPublicRooms;
+function generateFriendKey() {
+  const code = "CN-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Math.floor(10 + Math.random() * 90);
+  localStorage.setItem("connect_friend_key", code);
+  return code;
 }
 
 // Unique Username Registry
@@ -138,45 +96,15 @@ export function saveUserSettings(name, password, soundOn = true, vaultOn = true,
 
   currentUsername = handle;
   currentPassword = password.trim();
-  isSoundEnabled = soundOn;
-  isVaultEnabled = vaultOn;
   isSetupCompleted = true;
   lastActiveTimestamp = Date.now();
 
-  localStorage.setItem("connect_username", currentUsername);
-  localStorage.setItem("connect_password", currentPassword);
-  localStorage.setItem("connect_sound_enabled", isSoundEnabled ? "true" : "false");
-  localStorage.setItem("connect_vault_enabled", isVaultEnabled ? "true" : "false");
-  localStorage.setItem("connect_setup_completed", "true");
+  localStorage.setItem("connect_user_handle", currentUsername);
+  localStorage.setItem("connect_user_passcode", currentPassword);
+  localStorage.setItem("connect_setup_done", "true");
   localStorage.setItem("connect_last_active_timestamp", lastActiveTimestamp.toString());
-
-  return { username: currentUsername, password: currentPassword, friendKey, soundEnabled: isSoundEnabled, vaultEnabled: isVaultEnabled };
-}
-
-export function saveProfileCustomization(bio, status, bannerColor, avatarIcon) {
-  profileBio = bio.trim() || "Exploring Connect zero-trace communications suite.";
-  customStatus = status.trim() || "Online & Connected";
-  profileBannerColor = bannerColor || "#3b82f6";
-  profileAvatarIcon = avatarIcon || "code";
-
-  localStorage.setItem("connect_profile_bio", profileBio);
-  localStorage.setItem("connect_custom_status", customStatus);
-  localStorage.setItem("connect_profile_banner", profileBannerColor);
-  localStorage.setItem("connect_avatar_icon", profileAvatarIcon);
-
-  return { bio: profileBio, status: customStatus, bannerColor: profileBannerColor, avatarIcon: profileAvatarIcon };
-}
-
-export function getProfileBio() {
-  return profileBio;
-}
-
-export function getCustomStatus() {
-  return customStatus;
-}
-
-export function getProfileBannerColor() {
-  return profileBannerColor;
+  localStorage.setItem("connect_sound_enabled", soundOn.toString());
+  localStorage.setItem("connect_vault_enabled", vaultOn.toString());
 }
 
 export function getUsername() {
@@ -184,55 +112,59 @@ export function getUsername() {
 }
 
 export function getPassword() {
-  return currentPassword;
+  return currentPassword || "";
 }
 
-export function getFriends() {
-  return friendsList;
+export function saveProfileCustomization(bio, status, bannerColor = "#1e293b", badgeStyle = "code") {
+  profileBio = bio;
+  customStatus = status;
+  profileBannerColor = bannerColor;
+  profileBadgeStyle = badgeStyle;
+
+  localStorage.setItem("connect_profile_bio", bio);
+  localStorage.setItem("connect_custom_status", status);
+  localStorage.setItem("connect_profile_banner", bannerColor);
+  localStorage.setItem("connect_profile_badge", badgeStyle);
 }
 
-export function addFriend(inputVal) {
-  const raw = inputVal.trim();
-  let handle = raw;
+export function getProfileBio() { return profileBio; }
+export function getCustomStatus() { return customStatus; }
+export function getProfileBannerColor() { return profileBannerColor; }
 
-  if (!raw) {
-    throw new Error("Please enter a username or Friend Key.");
+// Friends List Management
+export function getFriends() { return connectedFriends; }
+
+export function addFriend(friendHandleOrKey) {
+  const clean = friendHandleOrKey.trim();
+  if (!clean) return;
+  if (!connectedFriends.includes(clean)) {
+    connectedFriends.push(clean);
+    localStorage.setItem("connect_friends_list", JSON.stringify(connectedFriends));
   }
-
-  if (raw.toUpperCase().startsWith("CN-")) {
-    handle = `@user_${raw.toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
-  } else {
-    const norm = raw.toLowerCase();
-    handle = norm.startsWith("@") ? norm : `@${norm}`;
-  }
-
-  if (handle.toLowerCase() === getUsername().toLowerCase()) {
-    throw new Error("You cannot add yourself as a friend.");
-  }
-
-  if (friendsList.some((f) => f.toLowerCase() === handle.toLowerCase())) {
-    throw new Error(`${handle} is already in your friends list.`);
-  }
-
-  friendsList.push(handle);
-  localStorage.setItem("connect_friends_list", JSON.stringify(friendsList));
-
-  if (!registeredUsernames[handle]) {
-    registeredUsernames[handle] = `uid_${handle.replace('@', '')}`;
-    localStorage.setItem("connect_registered_usernames", JSON.stringify(registeredUsernames));
-  }
-
-  return friendsList;
 }
 
-export function removeFriend(friendHandle) {
-  friendsList = friendsList.filter((f) => f.toLowerCase() !== friendHandle.toLowerCase());
-  localStorage.setItem("connect_friends_list", JSON.stringify(friendsList));
-  return friendsList;
+export function removeFriend(friendHandleOrKey) {
+  connectedFriends = connectedFriends.filter((f) => f !== friendHandleOrKey.trim());
+  localStorage.setItem("connect_friends_list", JSON.stringify(connectedFriends));
 }
 
-let friendAliasesMap = JSON.parse(localStorage.getItem("connect_friend_aliases") || "{}");
+// Public Rooms Hub Management
+export function getSavedPublicRooms() { return savedPublicRooms; }
 
+export function savePublicRoomToHub(roomCode, roomName = null, topic = null) {
+  const existing = savedPublicRooms.find((r) => r.code === roomCode);
+  if (!existing) {
+    savedPublicRooms.push({
+      code: roomCode,
+      name: roomName || `Public Room ${roomCode}`,
+      topic: topic || "Persistent community space",
+      lastVisitedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    localStorage.setItem("connect_saved_public_rooms", JSON.stringify(savedPublicRooms));
+  }
+}
+
+// Friend Aliases
 export function setFriendAlias(friendHandle, alias) {
   if (alias && alias.trim()) {
     friendAliasesMap[friendHandle.toLowerCase()] = alias.trim();
@@ -284,11 +216,17 @@ export function sendTypingIndicator(roomCode, uid, isTyping, textLength = 0) {
   if (roomChannel) {
     roomChannel.postMessage({
       type: "TYPING_STATUS",
-      uid,
+      typingUid: uid,
       isTyping,
       textLength
     });
   }
+  publishChatMessage(roomCode, {
+    type: "TYPING_STATUS",
+    typingUid: uid,
+    isTyping,
+    textLength
+  });
 }
 
 export function listenToTyping(onTypingChange) {
@@ -308,11 +246,12 @@ function notifyMessages() {
   }
 }
 
-// Zero-Permission Universal Chat Relay with Triple Transport (ntfy.sh + RESTful API KV)
+// Zero-Permission Universal Chat Relay with Quadruple Transport (ntfy.sh + RESTful API + Local Storage Event + BroadcastChannel)
 function publishChatMessage(roomCode, payload) {
-  const topic = `connect_msg_${roomCode.toUpperCase()}`;
-  
-  // Transport 1: ntfy.sh
+  const topic = `connect_msg_${roomCode.trim().toLowerCase()}`;
+  const bodyStr = JSON.stringify(payload);
+
+  // Transport 1: ntfy.sh POST
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
@@ -321,7 +260,7 @@ function publishChatMessage(roomCode, payload) {
         "Cache": "yes",
         "X-Cache": "yes"
       },
-      body: JSON.stringify(payload)
+      body: bodyStr
     }).catch(() => {});
   } catch (e) {}
 
@@ -335,6 +274,11 @@ function publishChatMessage(roomCode, payload) {
         data: payload
       })
     }).catch(() => {});
+  } catch (e) {}
+
+  // Transport 3: LocalStorage Event Broadcast
+  try {
+    localStorage.setItem(`connect_msg_event_${topic}`, JSON.stringify({ payload, timestamp: Date.now() }));
   } catch (e) {}
 }
 
@@ -396,7 +340,7 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
-  // Cross-device broadcast across triple transport layers
+  // Cross-device broadcast across transport layers
   publishChatMessage(roomCode, {
     type: "CHAT_MESSAGE",
     roomCode,
@@ -404,7 +348,7 @@ export async function sendMessage(roomCode, uid, payload) {
   });
 }
 
-// WhatsApp-Grade Message Quick Reactions
+// Quick Reactions
 export function toggleMessageReaction(roomCode, messageId, emoji) {
   const msg = messageStore.get(messageId);
   if (!msg) return;
@@ -426,6 +370,14 @@ export function toggleMessageReaction(roomCode, messageId, emoji) {
     roomChannel.postMessage(payload);
   }
   publishChatMessage(roomCode, payload);
+}
+
+export function purgeLocalMessages(roomCode) {
+  messageStore.clear();
+  notifyMessages();
+  if (roomChannel) {
+    roomChannel.postMessage({ type: "PURGE_CHAT", roomCode });
+  }
 }
 
 export function deleteMessage(roomCode, messageId) {
@@ -477,7 +429,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     } else if (type === "DELETE_MESSAGE" && messageId) {
       messageStore.delete(messageId);
       notifyMessages();
-    } else if (type === "TYPING_STATUS" && typingUid !== uid) {
+    } else if (type === "TYPING_STATUS" && typingUid && typingUid !== uid) {
       if (isTyping) {
         typingUsers.set(typingUid, { isTyping: true, textLength: textLength || 1 });
       } else {
@@ -492,10 +444,21 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
 
   roomChannel.onmessage = (event) => handleMessagePayload(event.data);
 
-  // Universal Triple-Transport Chat Listener
-  const topic = `connect_msg_${roomCode.toUpperCase()}`;
+  // Universal Quadruple-Transport Chat Listener
+  const topic = `connect_msg_${roomCode.trim().toLowerCase()}`;
   const processedMsgIds = new Set();
   let isClosed = false;
+
+  // LocalStorage Event Listener for instant same-browser cross-window sync
+  const storageListener = (e) => {
+    if (e.key === `connect_msg_event_${topic}` && e.newValue) {
+      try {
+        const { payload } = JSON.parse(e.newValue);
+        if (payload) handleMessagePayload(payload);
+      } catch (err) {}
+    }
+  };
+  window.addEventListener("storage", storageListener);
 
   // 1. ntfy.sh Polling every 1s (since=all)
   const pollIntervalNtfy = setInterval(async () => {
@@ -560,6 +523,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
 
   return () => {
     isClosed = true;
+    window.removeEventListener("storage", storageListener);
     clearInterval(pollIntervalNtfy);
     clearInterval(pollIntervalRest);
     if (sse) sse.close();
@@ -569,13 +533,4 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     }
     onMessagesUpdatedCallback = null;
   };
-}
-
-export function purgeLocalMessages(roomCode) {
-  messageStore.clear();
-  if (roomChannel) {
-    roomChannel.postMessage({ type: "PURGE_CHAT" });
-  }
-  publishChatMessage(roomCode, { type: "PURGE_CHAT" });
-  notifyMessages();
 }

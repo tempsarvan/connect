@@ -37,7 +37,7 @@ window.addEventListener("storage", (e) => {
 
 // Universal Zero-Permission HTTP Post Signal with Triple Transport
 export async function sendUniversalSignal(roomCode, payload) {
-  const topic = `connect_sig_${roomCode.toUpperCase()}`;
+  const topic = `connect_sig_${roomCode.trim().toLowerCase()}`;
   const bodyText = JSON.stringify(payload);
 
   // Transport 1: ntfy.sh
@@ -73,7 +73,7 @@ export async function sendUniversalSignal(roomCode, payload) {
 
 // Universal Zero-Permission Listener with Triple Transport
 export function listenUniversalSignal(roomCode, onUpdate) {
-  const topic = `connect_sig_${roomCode.toUpperCase()}`;
+  const topic = `connect_sig_${roomCode.trim().toLowerCase()}`;
   let isClosed = false;
 
   // Track processed message IDs to prevent duplicates
