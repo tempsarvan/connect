@@ -1,5 +1,5 @@
 // Zero-Permission Universal Real-Time Room Signaling Engine for Connect
-// Triple-Redundant Transport: ntfy.sh + RESTful API KV Relay + Local BroadcastChannel
+// Triple-Redundant Transport: ntfy.sh + RESTful API KV Relay + Local Storage & BroadcastChannel
 
 export function generateRoomCode() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -21,7 +21,7 @@ function notifyRoomListeners(roomCode, roomData) {
   }
 }
 
-// Window Storage Event & BroadcastChannel for same-device cross-tab sync
+// Window Storage Event for same-device cross-tab sync
 window.addEventListener("storage", (e) => {
   if (e.key && e.key.startsWith("connect_room_state_")) {
     const roomCode = e.key.replace("connect_room_state_", "");
@@ -35,12 +35,12 @@ window.addEventListener("storage", (e) => {
   }
 });
 
-// Universal Zero-Permission HTTP Post Signal with Triple Transport
+// Universal Zero-Permission HTTP Post Signal with Quadruple Transport
 export async function sendUniversalSignal(roomCode, payload) {
   const topic = `connect_sig_${roomCode.trim().toLowerCase()}`;
   const bodyText = JSON.stringify(payload);
 
-  // Transport 1: ntfy.sh
+  // Transport 1: ntfy.sh POST
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
@@ -61,22 +61,22 @@ export async function sendUniversalSignal(roomCode, payload) {
     }).catch(() => {});
   } catch (e) {}
 
-  // Transport 3: Local Storage
+  // Transport 3: Local Storage & Memory Broadcast
   try {
     const current = localRooms.get(roomCode) || {};
     const updated = { ...current, ...(payload.room || {}), status: payload.status || current.status };
     localRooms.set(roomCode, updated);
     localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(updated));
+    localStorage.setItem(`connect_room_signal_${topic}`, JSON.stringify({ payload, timestamp: Date.now() }));
     notifyRoomListeners(roomCode, updated);
   } catch (e) {}
 }
 
-// Universal Zero-Permission Listener with Triple Transport
+// Universal Zero-Permission Listener
 export function listenUniversalSignal(roomCode, onUpdate) {
   const topic = `connect_sig_${roomCode.trim().toLowerCase()}`;
   let isClosed = false;
 
-  // Track processed message IDs to prevent duplicates
   const processedMsgIds = new Set();
 
   const handleMessagePayload = (data) => {
@@ -92,7 +92,7 @@ export function listenUniversalSignal(roomCode, onUpdate) {
         code: roomCode,
         creator: current.creator || data.creator || joinerUid,
         members: newMembers,
-        status: newMembers.length >= 2 || data.status === "active" ? "active" : "waiting",
+        status: "active",
         createdAt: current.createdAt || Date.now()
       };
 
@@ -106,6 +106,17 @@ export function listenUniversalSignal(roomCode, onUpdate) {
       onUpdate({ status: "ended" });
     }
   };
+
+  // Storage listener for instant local sync
+  const storageListener = (e) => {
+    if (e.key === `connect_room_signal_${topic}` && e.newValue) {
+      try {
+        const { payload } = JSON.parse(e.newValue);
+        if (payload) handleMessagePayload(payload);
+      } catch (err) {}
+    }
+  };
+  window.addEventListener("storage", storageListener);
 
   // 1. ntfy.sh Polling every 1s
   const pollIntervalNtfy = setInterval(async () => {
@@ -170,6 +181,7 @@ export function listenUniversalSignal(roomCode, onUpdate) {
 
   return () => {
     isClosed = true;
+    window.removeEventListener("storage", storageListener);
     clearInterval(pollIntervalNtfy);
     clearInterval(pollIntervalRest);
     if (sse) sse.close();
@@ -228,7 +240,7 @@ export async function joinRoom(roomCode, uid) {
   localRooms.set(roomCode, room);
   localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
 
-  // Publish JOIN_REQUEST signal to room topic
+  // Publish JOIN_REQUEST signal immediately
   sendUniversalSignal(roomCode, {
     type: "JOIN_REQUEST",
     roomCode,
@@ -236,6 +248,23 @@ export async function joinRoom(roomCode, uid) {
     status: "active",
     room
   });
+
+  // Re-broadcast JOIN_REQUEST signal every 1.5 seconds to guarantee peer registration
+  let retransmits = 0;
+  const timer = setInterval(() => {
+    retransmits++;
+    if (retransmits > 5) {
+      clearInterval(timer);
+      return;
+    }
+    sendUniversalSignal(roomCode, {
+      type: "JOIN_REQUEST",
+      roomCode,
+      joinerUid: uid,
+      status: "active",
+      room
+    });
+  }, 1500);
 
   return room;
 }
@@ -250,7 +279,7 @@ export function listenToRoom(roomCode, onUpdate) {
     onUpdate(localRooms.get(roomCode));
   }
 
-  // Listen for universal signals (ntfy.sh + RESTful API KV + SSE)
+  // Listen for universal signals
   const cleanupUniversal = listenUniversalSignal(roomCode, (updatedRoom) => {
     onUpdate(updatedRoom);
   });

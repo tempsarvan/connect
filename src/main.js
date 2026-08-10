@@ -1173,14 +1173,14 @@ async function handleGenerateKey(isPublic = false, pubName = null, pubTopic = nu
         if (views.chat.classList.contains("active") || views.waiting.classList.contains("active")) {
           onSessionEnded();
         }
-      } else if (roomData.status === "active" && roomData.members.length >= 2) {
+      } else if (roomData.status === "active") {
         const handshakeText = document.getElementById("waiting-handshake-text");
         if (handshakeText) handshakeText.textContent = "2-Way Key Handshake Registered! Entering encrypted room stream...";
         setTimeout(() => {
           if (!views.chat.classList.contains("active")) {
             startChatSession();
           }
-        }, 500);
+        }, 200);
       }
     });
   } catch (err) {
