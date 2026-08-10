@@ -1,4 +1,5 @@
 // Zero-Permission Universal Chat Bus for Connect with WhatsApp-Grade Reactions & Triple-Redundant Transport
+import { encryptPayload, decryptPayload } from "./cryptoEngine";
 
 let roomChannel = null;
 let globalEventsChannel = null;
@@ -343,11 +344,15 @@ export async function sendMessage(roomCode, uid, payload) {
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgId = "msg_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
   
+  // Encrypt message text using AES-GCM 256-bit cryptography
+  const encryptedText = await encryptPayload(roomCode, text.trim());
+
   const msgObj = {
     id: msgId,
     sender: uid,
     senderName,
     text: text.trim(),
+    encryptedText,
     mediaType,
     mediaUrl,
     replyTo,
@@ -433,11 +438,14 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   }
   roomChannel = new BroadcastChannel(`connect_chat_${roomCode}`);
 
-  const handleMessagePayload = (data) => {
+  const handleMessagePayload = async (data) => {
     const { type, message, messageId, reactions, typingUid, isTyping, textLength } = data || {};
     
     if (type === "CHAT_MESSAGE" && message) {
       if (!messageStore.has(message.id)) {
+        if (message.encryptedText && message.encryptedText.startsWith("ENC:")) {
+          message.text = await decryptPayload(roomCode, message.encryptedText);
+        }
         messageStore.set(message.id, message);
         notifyMessages();
       }

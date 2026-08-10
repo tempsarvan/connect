@@ -4,7 +4,8 @@ export const views = {
   showcase: document.getElementById("view-showcase"),
   landing: document.getElementById("view-landing"),
   waiting: document.getElementById("view-waiting"),
-  chat: document.getElementById("view-chat")
+  chat: document.getElementById("view-chat"),
+  connectHub: document.getElementById("view-connect-hub")
 };
 
 export const buttons = {
@@ -15,8 +16,6 @@ export const buttons = {
   heroLogin: document.getElementById("btn-hero-login"),
   heroSignup: document.getElementById("btn-hero-signup"),
   startTourScroll: document.getElementById("btn-start-tour-scroll"),
-  enterConnectFinal: document.getElementById("btn-enter-connect-final"),
-  finalLogin: document.getElementById("btn-final-login"),
   closeAuthModal: document.getElementById("btn-close-auth-modal"),
   authTabSignup: document.getElementById("btn-auth-tab-signup"),
   authTabLogin: document.getElementById("btn-auth-tab-login"),
@@ -28,22 +27,20 @@ export const buttons = {
   editProfileFromCard: document.getElementById("btn-edit-profile-from-card"),
   closeEditProfile: document.getElementById("btn-close-edit-profile"),
   saveProfileCustomization: document.getElementById("btn-save-profile-customization"),
-  closeCreatePublic: document.getElementById("btn-close-create-public"),
-  submitCreatePublic: document.getElementById("btn-submit-create-public"),
   inviteFriendsWaiting: document.getElementById("btn-invite-friends-waiting"),
   inviteFriendsChat: document.getElementById("btn-invite-friends-chat"),
   closeInviteFriends: document.getElementById("btn-close-invite-friends"),
-  deviceComputer: document.getElementById("btn-device-computer"),
-  deviceTablet: document.getElementById("btn-device-tablet"),
-  devicePhone: document.getElementById("btn-device-phone"),
   gearLanding: document.getElementById("btn-gear-landing"),
   gearChat: document.getElementById("btn-gear-chat"),
   closeFullscreenSettings: document.getElementById("btn-close-fullscreen-settings"),
   saveFullscreenSettings: document.getElementById("btn-save-fullscreen-settings"),
-  createPrivateCode: document.getElementById("btn-create-private-code"),
-  createPublicCode: document.getElementById("btn-create-public-code"),
+  modePrivate: document.getElementById("btn-mode-private"),
+  modePublic: document.getElementById("btn-mode-public"),
+  createRoomKey: document.getElementById("btn-create-room-key"),
   join: document.getElementById("btn-join"),
   copyCode: document.getElementById("btn-copy-code"),
+  copyCodeChat: document.getElementById("btn-copy-code-chat"),
+  enterRoomDirect: document.getElementById("btn-enter-room-direct"),
   cancelRoom: document.getElementById("btn-cancel-room"),
   endSession: document.getElementById("btn-end-session"),
   send: document.getElementById("btn-send"),
@@ -56,8 +53,18 @@ export const buttons = {
   returnHome: document.getElementById("btn-return-home"),
   profileLanding: document.getElementById("btn-profile-landing"),
   profileHeader: document.getElementById("btn-profile-header"),
-  toggleSaved: document.getElementById("btn-toggle-saved"),
-  closeLightbox: document.getElementById("btn-close-lightbox")
+  closeLightbox: document.getElementById("btn-close-lightbox"),
+  launchConnectHub: document.getElementById("btn-launch-connect-hub"),
+  moveToConnectHub: document.getElementById("btn-move-to-connect-hub"),
+  exitConnectHub: document.getElementById("btn-exit-connect-hub"),
+  openDevTools: document.getElementById("btn-open-dev-tools"),
+  closeDevEditor: document.getElementById("btn-close-dev-editor"),
+  runDevCode: document.getElementById("btn-run-dev-code"),
+  shareDevCode: document.getElementById("btn-share-dev-code"),
+  openDesignTools: document.getElementById("btn-open-design-tools"),
+  closeDesignCanvas: document.getElementById("btn-close-design-canvas"),
+  clearCanvas: document.getElementById("btn-clear-canvas"),
+  shareCanvas: document.getElementById("btn-share-canvas")
 };
 
 export const inputs = {

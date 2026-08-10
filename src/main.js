@@ -36,6 +36,13 @@ import {
 import { processImageFile } from "./media";
 import { startVoiceRecording, stopVoiceRecording } from "./audio";
 import { exportVaultBackup, panicWipeAllData } from "./vault";
+import { runJavaScriptSnippet } from "./devSuite";
+import { initDesignCanvas } from "./designSuite";
+import { 
+  initConnectHubDesktop, 
+  openHubAppWindow, 
+  closeHubAppWindow 
+} from "./connectHub";
 import { 
   views, 
   buttons, 
@@ -60,6 +67,7 @@ let currentRoomCode = null;
 let isCurrentRoomPublic = false;
 let currentPublicRoomInfo = null;
 let currentRoomMembersList = [];
+let selectedRoomMode = "private";
 
 let currentUid = null;
 let roomUnsubscribe = null;
@@ -67,9 +75,11 @@ let chatUnsubscribe = null;
 let currentAuthMode = "signup";
 let selectedBannerColor = getProfileBannerColor();
 let isRecordingVoice = false;
+let designCanvasControls = null;
 
 async function init() {
   setupEventListeners();
+  initConnectHubDesktop();
 
   try {
     currentUid = await initAuth();
@@ -93,7 +103,7 @@ async function init() {
       showToast(`Scanned QR Code! Auto-entering room [${qrJoinCode.toUpperCase()}]...`);
     }, 400);
   } else {
-    // Default directly to Connect Messenger Dashboard (Landing)
+    // Default directly to Connect Messenger Dashboard
     showView("landing");
   }
 
@@ -101,10 +111,10 @@ async function init() {
     touchSession();
   }
 
-  // Initialize Global Room Invitation Listener
+  // Global Room Invitation Listener
   initGlobalEvents(({ sender, roomCode, roomName, isPublic }) => {
     soundEngine.playSoundFX("bell");
-    showToast(`🔔 ${sender} invited you to ${isPublic ? 'Public' : 'Private'} Room [${roomCode}]!`, 6000);
+    showToast(`Invitation: ${sender} invited you to ${isPublic ? 'Public' : 'Private'} Room [${roomCode}]!`, 6000);
     inputs.code.value = roomCode;
   });
 
@@ -235,36 +245,16 @@ function handleSaveProfileCustomization() {
   showToast("Profile customization saved!");
 }
 
-function openCreatePublicModal() {
-  inputs.publicRoomName.value = "";
-  inputs.publicRoomTopic.value = "";
-  displays.modalCreatePublicRoom.classList.remove("hidden");
-  setTimeout(() => inputs.publicRoomName.focus(), 100);
-}
-
-function handleCreatePublicCodeSubmit() {
-  const name = inputs.publicRoomName.value.trim();
-  const topic = inputs.publicRoomTopic.value.trim();
-
-  if (!name) {
-    showToast("Please enter a room name e.g. Lounge, Beats, Dev Squad");
-    return;
-  }
-
-  displays.modalCreatePublicRoom.classList.add("hidden");
-  handleCreateRoom(true, name, topic);
-}
-
 function openInviteFriendsModal() {
   const friends = getFriends();
 
   renderInviteFriendsList(friends, (friendHandle) => {
     if (!currentRoomCode) {
-      showToast("No active room code to share.");
+      showToast("No active room key to share.");
       return;
     }
     sendRoomInvitation(friendHandle, currentRoomCode, currentPublicRoomInfo?.name || null, isCurrentRoomPublic);
-    showToast(`Sent ${isCurrentRoomPublic ? 'Public' : 'Private'} Room code [${currentRoomCode}] to ${friendHandle}!`);
+    showToast(`Sent ${isCurrentRoomPublic ? 'Public' : 'Private'} Room Key [${currentRoomCode}] to ${friendHandle}!`);
   });
 
   displays.modalInviteFriends.classList.remove("hidden");
@@ -281,19 +271,145 @@ function updateFriendsUI() {
     },
     (friendHandle) => {
       displays.modalFriendsList.classList.add("hidden");
-      handleCreateRoom(false);
-      showToast(`Starting private room for ${friendHandle}...`);
+      selectedRoomMode = "private";
+      handleCreateRoomKey();
+      showToast(`Starting private room key for ${friendHandle}...`);
     }
   );
 }
 
 function setupEventListeners() {
+  // Unified Room Key Generator Mode Toggle
+  buttons.modePrivate?.addEventListener("click", () => {
+    selectedRoomMode = "private";
+    buttons.modePrivate.classList.add("active");
+    buttons.modePublic.classList.remove("active");
+    document.getElementById("public-room-details-group")?.classList.add("hidden");
+  });
+
+  buttons.modePublic?.addEventListener("click", () => {
+    selectedRoomMode = "public";
+    buttons.modePublic.classList.add("active");
+    buttons.modePrivate.classList.remove("active");
+    document.getElementById("public-room-details-group")?.classList.remove("hidden");
+  });
+
+  buttons.createRoomKey?.addEventListener("click", handleCreateRoomKey);
+
+  // Connect Hub Desktop Launchers
+  buttons.launchConnectHub?.addEventListener("click", () => {
+    showView("connectHub");
+    openHubAppWindow("connect");
+    showToast("Launched Connect Hub Web Desktop Platform");
+  });
+
+  buttons.moveToConnectHub?.addEventListener("click", () => {
+    showView("connectHub");
+    openHubAppWindow("connect");
+    syncHubMessages();
+    showToast("Moved active chat session to Connect Hub Messages App!");
+  });
+
+  buttons.exitConnectHub?.addEventListener("click", () => {
+    if (currentRoomCode) showView("chat");
+    else showView("landing");
+  });
+
+  // Hub Messages send handler
+  document.getElementById("hub-btn-send")?.addEventListener("click", async () => {
+    const input = document.getElementById("hub-input-message");
+    const text = input.value.trim();
+    if (text && currentRoomCode) {
+      input.value = "";
+      await sendMessage(currentRoomCode, currentUid, { text, mediaType: "text" });
+      soundEngine.playMessageDing();
+    }
+  });
+
+  // Drawing Whiteboard Tool Handlers
+  buttons.openDesignTools?.addEventListener("click", () => {
+    displays.dropdownToolsMenu?.classList.add("hidden");
+    const modal = document.getElementById("modal-design-canvas");
+    modal?.classList.remove("hidden");
+    const canvas = document.getElementById("design-whiteboard-canvas");
+    if (canvas && !designCanvasControls) {
+      designCanvasControls = initDesignCanvas(canvas);
+    }
+  });
+
+  buttons.closeDesignCanvas?.addEventListener("click", () => {
+    document.getElementById("modal-design-canvas")?.classList.add("hidden");
+  });
+
+  buttons.clearCanvas?.addEventListener("click", () => {
+    if (designCanvasControls) designCanvasControls.clear();
+  });
+
+  buttons.shareCanvas?.addEventListener("click", async () => {
+    if (designCanvasControls && currentRoomCode) {
+      const dataUrl = designCanvasControls.exportPNG();
+      await sendMessage(currentRoomCode, currentUid, {
+        text: "Canvas Whiteboard Sketch",
+        mediaType: "image",
+        mediaUrl: dataUrl
+      });
+      document.getElementById("modal-design-canvas")?.classList.add("hidden");
+      soundEngine.playMessageDing();
+      showToast("Shared Canvas Sketch in chat!");
+    }
+  });
+
+  document.querySelectorAll(".canvas-swatch").forEach((swatch) => {
+    swatch.addEventListener("click", () => {
+      document.querySelectorAll(".canvas-swatch").forEach((s) => s.classList.remove("active"));
+      swatch.classList.add("active");
+      const color = swatch.dataset.canvasColor;
+      if (designCanvasControls) designCanvasControls.setColor(color);
+    });
+  });
+
+  // IDE Code Evaluator Tool Handlers
+  buttons.openDevTools?.addEventListener("click", () => {
+    displays.dropdownToolsMenu?.classList.add("hidden");
+    document.getElementById("modal-dev-editor")?.classList.remove("hidden");
+  });
+
+  buttons.closeDevEditor?.addEventListener("click", () => {
+    document.getElementById("modal-dev-editor")?.classList.add("hidden");
+  });
+
+  buttons.runDevCode?.addEventListener("click", () => {
+    const code = document.getElementById("dev-code-input").value;
+    const res = runJavaScriptSnippet(code);
+    const out = document.getElementById("dev-console-output");
+    if (res.success) {
+      out.textContent = `> Output: ${res.logs.join("\n") || res.result || "Executed cleanly"}`;
+      out.style.color = "#7ee787";
+    } else {
+      out.textContent = `> Error: ${res.error}`;
+      out.style.color = "#f85149";
+    }
+  });
+
+  buttons.shareDevCode?.addEventListener("click", async () => {
+    const code = document.getElementById("dev-code-input").value.trim();
+    if (code && currentRoomCode) {
+      await sendMessage(currentRoomCode, currentUid, {
+        text: `\`\`\`js\n${code}\n\`\`\``,
+        mediaType: "text"
+      });
+      document.getElementById("modal-dev-editor")?.classList.add("hidden");
+      soundEngine.playMessageDing();
+      showToast("Shared Code Snippet in chat!");
+    }
+  });
+
   // Voice Recording Toggle
   buttons.recordVoiceNote?.addEventListener("click", async () => {
     displays.dropdownToolsMenu.classList.add("hidden");
     if (!isRecordingVoice) {
       isRecordingVoice = true;
-      showToast("🎙️ Recording Voice Note... Tap again to send!");
+      showToast("Recording Voice Note... Tap again to send!");
       await startVoiceRecording();
     } else {
       isRecordingVoice = false;
@@ -301,7 +417,7 @@ function setupEventListeners() {
       const audioUrl = await stopVoiceRecording();
       if (audioUrl && currentRoomCode) {
         await sendMessage(currentRoomCode, currentUid, {
-          text: "🎙️ Voice Note",
+          text: "Voice Note",
           mediaType: "audio",
           mediaUrl: audioUrl
         });
@@ -323,7 +439,7 @@ function setupEventListeners() {
 
   // Panic Wipe & Vault Export
   buttons.panicWipe?.addEventListener("click", () => {
-    if (confirm("⚡ Are you sure you want to 1-Click Panic Wipe all local memory, cookies, and tokens?")) {
+    if (confirm("Are you sure you want to 1-Click Panic Wipe all local memory, cookies, and tokens?")) {
       panicWipeAllData();
     }
   });
@@ -333,7 +449,7 @@ function setupEventListeners() {
     showToast("Vault Backup downloaded!");
   });
 
-  // Upward Expanding Tools Menu Toggle
+  // Expression Tools Menu Toggle
   buttons.toolsMenuToggle?.addEventListener("click", (e) => {
     e.stopPropagation();
     displays.dropdownToolsMenu.classList.toggle("hidden");
@@ -345,7 +461,7 @@ function setupEventListeners() {
     }
   });
 
-  // Showcase Navigation & Tour
+  // Navigation & Tour
   buttons.navLogin?.addEventListener("click", () => {
     if (hasValidSession()) enterConnectApp();
     else openAuthModal("login");
@@ -380,7 +496,7 @@ function setupEventListeners() {
   buttons.navFeatures?.addEventListener("click", () => {
     showView("showcase");
     setTimeout(() => {
-      document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
+      document.getElementById("section-changelog")?.scrollIntoView({ behavior: "smooth" });
     }, 100);
   });
 
@@ -396,7 +512,7 @@ function setupEventListeners() {
   });
   buttons.submitAuth?.addEventListener("click", handleAuthSubmit);
 
-  // Profile Customization Studio Handlers
+  // Profile Customization Handlers
   buttons.closeProfileCard?.addEventListener("click", () => displays.modalProfileCard.classList.add("hidden"));
   buttons.closeEditProfile?.addEventListener("click", closeEditProfileStudio);
   buttons.saveProfileCustomization?.addEventListener("click", handleSaveProfileCustomization);
@@ -409,12 +525,8 @@ function setupEventListeners() {
     });
   });
 
-  // Create Public Code Handlers
-  buttons.createPublicCode?.addEventListener("click", openCreatePublicModal);
-  buttons.closeCreatePublic?.addEventListener("click", () => displays.modalCreatePublicRoom.classList.add("hidden"));
-  buttons.submitCreatePublic?.addEventListener("click", handleCreatePublicCodeSubmit);
-
   // Room Invitations Handlers
+  buttons.inviteFriendsWaiting?.addEventListener("click", openInviteFriendsModal);
   buttons.inviteFriendsChat?.addEventListener("click", openInviteFriendsModal);
   buttons.closeInviteFriends?.addEventListener("click", () => displays.modalInviteFriends.classList.add("hidden"));
 
@@ -444,9 +556,9 @@ function setupEventListeners() {
     }
   });
 
-  // Private & Public Room Creation & Joining
-  buttons.createPrivateCode?.addEventListener("click", () => handleCreateRoom(false));
+  // Key joining & copy buttons
   buttons.join?.addEventListener("click", handleJoinRoom);
+  buttons.enterRoomDirect?.addEventListener("click", startChatSession);
 
   inputs.code?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") handleJoinRoom();
@@ -456,21 +568,18 @@ function setupEventListeners() {
     inputs.code.value = inputs.code.value.toUpperCase().trim();
   });
 
-  buttons.copyCode?.addEventListener("click", () => {
-    if (currentRoomCode) {
-      navigator.clipboard.writeText(currentRoomCode);
-      showToast(`Room code [${currentRoomCode}] copied to clipboard!`);
-    }
-  });
+  buttons.copyCode?.addEventListener("click", copyCurrentRoomKey);
+  buttons.copyCodeChat?.addEventListener("click", copyCurrentRoomKey);
 
+  buttons.cancelRoom?.addEventListener("click", handleCancelRoom);
   buttons.endSession?.addEventListener("click", handleEndSession);
   buttons.returnHome?.addEventListener("click", handleReturnHome);
 
-  // Profile Cards on Header Pills
+  // Profile Cards
   buttons.profileLanding?.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
   buttons.profileHeader?.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
 
-  // Settings Gear
+  // Settings
   buttons.gearLanding?.addEventListener("click", openFullscreenSettings);
   buttons.gearChat?.addEventListener("click", openFullscreenSettings);
   buttons.closeFullscreenSettings?.addEventListener("click", closeFullscreenSettings);
@@ -496,6 +605,13 @@ function setupEventListeners() {
   });
 
   buttons.closeLightbox?.addEventListener("click", closeLightbox);
+}
+
+function copyCurrentRoomKey() {
+  if (currentRoomCode) {
+    navigator.clipboard.writeText(currentRoomCode);
+    showToast(`Room Key [${currentRoomCode}] copied to clipboard!`);
+  }
 }
 
 function openFullscreenSettings() {
@@ -599,16 +715,20 @@ async function handleFileUpload(e, targetRoomId) {
   }
 }
 
-async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = null) {
+async function handleCreateRoomKey() {
   if (!currentUid) currentUid = getUserUid();
 
+  const isPublic = selectedRoomMode === "public";
   const roomCode = generateRoomCode();
   isCurrentRoomPublic = isPublic;
   
   if (isPublic) {
+    const nameInput = document.getElementById("input-public-name-dash");
+    const topicInput = document.getElementById("input-public-topic-dash");
+
     currentPublicRoomInfo = {
-      name: roomName || `Public Room ${roomCode}`,
-      topic: roomTopic || "Persistent community space"
+      name: nameInput?.value.trim() || `Public Room ${roomCode}`,
+      topic: topicInput?.value.trim() || "Persistent community space"
     };
     savePublicRoomToHub(roomCode, currentPublicRoomInfo.name, currentPublicRoomInfo.topic);
   } else {
@@ -623,19 +743,42 @@ async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = n
       registerUnloadCleanup(currentRoomCode);
     }
 
-    // Instantly launch chat room session so messenger is immediately active!
+    displays.roomCode.textContent = roomCode;
+    displays.roomTypeBadgeWaiting.textContent = isPublic ? "🌐 Persistent Public Room Key" : "🔒 Ephemeral Private Room Key";
+
     soundEngine.playSoundFX("bell");
-    startChatSession();
-    showToast(`Created ${isPublic ? 'Public' : 'Private'} Room [${roomCode}]! Share code to chat.`);
+    showView("waiting");
+    showToast(`Generated 6-Digit Room Key [${roomCode}]! Waiting for 2-way peer registration.`);
+
+    // 2-Way Handshake Listener
+    if (roomUnsubscribe) roomUnsubscribe();
+    roomUnsubscribe = listenToRoom(roomCode, (roomData) => {
+      if (roomData && roomData.members) {
+        currentRoomMembersList = roomData.members;
+      }
+      if (!roomData || roomData.status === "ended") {
+        if (views.chat.classList.contains("active") || views.waiting.classList.contains("active")) {
+          onSessionEnded();
+        }
+      } else if (roomData.status === "active" && roomData.members.length >= 2) {
+        const handshakeText = document.getElementById("waiting-handshake-text");
+        if (handshakeText) handshakeText.textContent = "2-Way Key Handshake Registered! Entering encrypted room stream...";
+        setTimeout(() => {
+          if (!views.chat.classList.contains("active")) {
+            startChatSession();
+          }
+        }, 500);
+      }
+    });
   } catch (err) {
-    showToast(err.message || "Failed to create room.");
+    showToast(err.message || "Failed to create room key.");
   }
 }
 
 async function handleJoinRoom() {
   const code = inputs.code.value.trim().toUpperCase();
   if (!code || code.length !== 6) {
-    showToast("Please enter a valid 6-character code");
+    showToast("Please enter a valid 6-character room key");
     return;
   }
 
@@ -646,7 +789,6 @@ async function handleJoinRoom() {
     await joinRoom(code, currentUid, getUsername());
     currentRoomCode = code;
 
-    // Check if room code exists in saved public rooms
     const savedRooms = getSavedPublicRooms();
     const match = savedRooms.find((r) => r.code === code);
     if (match) {
@@ -659,7 +801,7 @@ async function handleJoinRoom() {
 
     soundEngine.playSoundFX("bell");
     startChatSession();
-    showToast(`Entered Room [${code}]!`);
+    showToast(`Registered Room Key [${code}]!`);
   } catch (err) {
     showToast(err.message || "Could not join room.");
   } finally {
@@ -669,13 +811,14 @@ async function handleJoinRoom() {
 
 function startChatSession() {
   displays.chatRoomCode.textContent = currentRoomCode;
-  displays.chatHeaderRoomType.textContent = isCurrentRoomPublic ? `🌐 ${currentPublicRoomInfo?.name || 'Public Room'}` : "🔒 Ephemeral Room";
+  displays.chatHeaderRoomType.textContent = isCurrentRoomPublic ? `🌐 ${currentPublicRoomInfo?.name || 'Public Room'}` : "🔒 AES-GCM Encrypted Room";
   showView("chat");
   setTimeout(() => inputs.message.focus(), 100);
 
   if (chatUnsubscribe) chatUnsubscribe();
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
     renderMessages(messages, currentUid, displays.messagesList);
+    syncHubMessages();
   });
 
   if (roomUnsubscribe) roomUnsubscribe();
@@ -687,6 +830,20 @@ function startChatSession() {
       onSessionEnded();
     }
   });
+}
+
+function syncHubMessages() {
+  const hubMessagesList = document.getElementById("hub-messages-list");
+  if (hubMessagesList && displays.messagesList) {
+    hubMessagesList.innerHTML = displays.messagesList.innerHTML;
+  }
+}
+
+async function handleCancelRoom() {
+  if (currentRoomCode && !isCurrentRoomPublic) {
+    await destroyRoomSession(currentRoomCode);
+  }
+  resetAppState();
 }
 
 async function handleEndSession() {
