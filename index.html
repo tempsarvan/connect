@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="description" content="Connect — Ephemeral private messaging & persistent public rooms. No traces.">
+  <meta name="description" content="Connect — Ephemeral private messaging & persistent public rooms. Tailored editions for Coders & Designers.">
   <title>Connect — Ephemeral & Public Communications Suite</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,10 +11,12 @@
   <link rel="stylesheet" href="/styles/reset.css">
   <link rel="stylesheet" href="/styles/tokens.css">
   <link rel="stylesheet" href="/styles/main.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>·</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
 </head>
-<body>
+<body data-edition="standard">
   <div id="app">
+    <!-- DIRECTIONAL VARIANT TRANSITION OVERLAY -->
+    <div id="variant-transition-overlay" class="variant-transition-overlay hidden"></div>
 
     <!-- BREATHTAKING SHOWCASE LANDING PAGE & INTERACTIVE TOUR VIEW -->
     <section id="view-showcase" class="view active">
@@ -22,16 +24,24 @@
       
       <header class="showcase-nav">
         <div class="showcase-brand">
-          <span class="showcase-logo-dot"></span>
+          <img src="/logo.svg" alt="Connect official logo" width="28" height="28" style="filter:drop-shadow(0 0 8px rgba(96,165,250,0.5));">
           <span class="showcase-logo-text">connect</span>
         </div>
+
+        <!-- CONNECT VARIANTS HEADER TABS -->
+        <div class="showcase-edition-tabs">
+          <button id="btn-edition-standard" class="edition-tab active" data-edition="standard">⚡ Just Connect</button>
+          <button id="btn-edition-dev" class="edition-tab" data-edition="dev">💻 Connect for Coders</button>
+          <button id="btn-edition-design" class="edition-tab" data-edition="design">🎨 Connect for Designers</button>
+        </div>
+
         <div class="showcase-nav-links">
           <button id="btn-nav-tour" class="showcase-link-btn" title="Product Tour">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
             <span>Tour</span>
           </button>
           <button id="btn-nav-features" class="showcase-link-btn" title="Change Log">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 4-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             <span>Change Log</span>
           </button>
           <button id="btn-nav-login" class="btn btn-ghost showcase-cta-sm" title="Log In">
@@ -49,13 +59,30 @@
         <!-- Hero Section -->
         <div class="showcase-hero">
           <div class="hero-badge">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            <span>ZERO-TRACE EPHEMERAL & PERSISTENT SUITE</span>
+            <img src="/logo.svg" width="14" height="14" alt="logo icon">
+            <span id="hero-badge-edition-text">ZERO-TRACE EPHEMERAL & PERSISTENT SUITE</span>
+          </div>
+
+          <!-- Niche Coding Hero Terminal Box (Visible in Coders Mode) -->
+          <div id="hero-coder-terminal" class="hero-coder-terminal dev-only">
+            <div class="terminal-dots"><span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span><span class="terminal-title">connect-cli — v2.6.0</span></div>
+            <pre class="terminal-body"><code>$ connect init --variant=coders --zero-trace=true
+[OK] Initialized SSE + HTTP Polling Relay channel
+[OK] Memory Vault: Encrypted • 0 Logs Saved
+> Listening on room stream...</code></pre>
+          </div>
+
+          <!-- Human Design Floating Swatches (Visible in Designers Mode) -->
+          <div id="hero-designer-swatches" class="hero-designer-swatches design-only">
+            <span class="design-swatch-pill" style="background:#f43f5e;">#f43f5e • Rose</span>
+            <span class="design-swatch-pill" style="background:#8b5cf6;">#8b5cf6 • Violet</span>
+            <span class="design-swatch-pill" style="background:#06b6d4;">#06b6d4 • Cyan</span>
+            <span class="design-swatch-pill" style="background:#10b981;">#10b981 • Emerald</span>
           </div>
           
-          <h1 class="hero-title">Talk freely.<br>Leave no trace.</h1>
+          <h1 id="hero-headline-edition" class="hero-title">Talk freely.<br>Leave no trace.</h1>
           
-          <p class="hero-subtitle">
+          <p id="hero-subtitle-edition" class="hero-subtitle">
             Connect is a hybrid communications suite engineered for phone, tablet, and desktop. Experience 6-digit private & public room codes, instant device QR pairing, unique handle protection, and 1 TB file support.
           </p>
 
@@ -130,30 +157,6 @@
               <h3 class="tour-card-title">1 Terabyte (1 TB) File Uploads</h3>
               <p class="tour-card-desc">Attach high-definition media, code archives, or massive documents with support for file attachments up to 1 TB.</p>
             </div>
-
-            <div class="tour-card">
-              <div class="tour-card-icon-wrapper">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              </div>
-              <h3 class="tour-card-title">Dynamic Rooms Archive Hub</h3>
-              <p class="tour-card-desc">Public room codes automatically save into your main hub's Rooms section, expanding dynamically as your room list grows.</p>
-            </div>
-
-            <div class="tour-card">
-              <div class="tour-card-icon-wrapper">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </div>
-              <h3 class="tour-card-title">Mobile Upward Expression Dropdown</h3>
-              <p class="tour-card-desc">Mobile-optimized upward tools dropdown menu floating neatly above the typebar for seamless attachment access on phone screens.</p>
-            </div>
-
-            <div class="tour-card">
-              <div class="tour-card-icon-wrapper">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              </div>
-              <h3 class="tour-card-title">Passcode Device Lock & Vault</h3>
-              <p class="tour-card-desc">3-day auto-session lock with PIN passcode verification and client-side device encryption memory.</p>
-            </div>
           </div>
         </section>
 
@@ -166,47 +169,54 @@
           </div>
 
           <div class="changelog-timeline">
-            <!-- Changelog Entry v2.4.0 -->
+            <!-- Changelog Entry v2.6.0 -->
             <div class="changelog-card">
               <div class="changelog-badge-row">
-                <span class="changelog-version">v2.4.0</span>
-                <span class="changelog-date">Latest Release • Live</span>
+                <span class="changelog-version">v2.6.5</span>
+                <span class="changelog-date">Connect Variants Release • Live</span>
               </div>
-              <h3 class="changelog-title">Device QR Pairing & Unique Friend Keys</h3>
+              <h3 class="changelog-title">Connect Variants & Audience-Themed Landing Pages</h3>
               <ul class="changelog-list">
-                <li><span class="changelog-bullet">✦</span> <strong>Instant QR Code Device Pairing</strong>: Generate vector QR codes for phone & tablet device scanning.</li>
-                <li><span class="changelog-bullet">✦</span> <strong>Unique 8-Character Friend Keys</strong>: Connect using permanent Friend Keys (e.g. <code>CN-9X4A-82</code>) or unique handles.</li>
-                <li><span class="changelog-bullet">✦</span> <strong>Upward Expression Menu</strong>: Mobile-optimized upward-expanding dropdown popup menu for fast image and 1 TB document attachments.</li>
+                <li><span class="changelog-bullet">✦</span> <strong>Animated Variant Icon Tabs</strong>: Interactive footer tabs switching UIs dynamically.</li>
+                <li><span class="changelog-bullet">✦</span> <strong>Connect for Coders</strong>: IDE terminal hero, bracket watermarks, and live execution.</li>
+                <li><span class="changelog-bullet">✦</span> <strong>Connect for Designers</strong>: Human Design aesthetics, floating color palettes, and Canvas status bars.</li>
               </ul>
             </div>
+          </div>
+        </section>
 
-            <!-- Changelog Entry v2.3.0 -->
-            <div class="changelog-card">
-              <div class="changelog-badge-row">
-                <span class="changelog-version">v2.3.0</span>
-                <span class="changelog-date">Architecture Release</span>
-              </div>
-              <h3 class="changelog-title">Dual Private vs. Public Rooms & Dynamic Rooms Archive</h3>
-              <ul class="changelog-list">
-                <li><span class="changelog-bullet">✦</span> <strong>6-Digit Private Ephemeral Codes</strong>: Auto-delete session data on exit.</li>
-                <li><span class="changelog-bullet">✦</span> <strong>6-Digit Persistent Public Codes</strong>: Automatically saved into the main hub's dynamic expanding <code>Rooms</code> section.</li>
-                <li><span class="changelog-bullet">✦</span> <strong>Unified Join Input</strong>: Enter any 6-digit room code to join private or public sessions seamlessly.</li>
-              </ul>
-            </div>
+        <!-- CONNECT VARIANTS ANIMATED ICON TABS SECTION (FOOTER NEARBY) -->
+        <section id="section-connect-variants" class="showcase-section variants-footer-section">
+          <div class="section-header">
+            <span class="section-tag">CONNECT VARIANTS</span>
+            <h2 class="section-title">Choose Your Connect Experience</h2>
+            <p class="section-desc">Click an animated variant tab to re-theme the landing page and app UI instantly.</p>
+          </div>
 
-            <!-- Changelog Entry v2.2.0 -->
-            <div class="changelog-card">
-              <div class="changelog-badge-row">
-                <span class="changelog-version">v2.2.0</span>
-                <span class="changelog-date">Security Release</span>
+          <div class="variant-animated-tabs-bar">
+            <button class="variant-animated-tab active" data-variant="standard">
+              <span class="tab-icon">⚡</span>
+              <div class="tab-label-group">
+                <span class="tab-name">Just Connect</span>
+                <span class="tab-sub">Standard Privacy Suite</span>
               </div>
-              <h3 class="changelog-title">Unique Handle Engine & Passcode Security</h3>
-              <ul class="changelog-list">
-                <li><span class="changelog-bullet">✦</span> <strong>Global Username Claim Engine</strong>: Permanently lock your unique handle to your device.</li>
-                <li><span class="changelog-bullet">✦</span> <strong>3-Day Auto Session Lock</strong>: Protects sessions with private PIN passcode authentication.</li>
-                <li><span class="changelog-bullet">✦</span> <strong>1 TB Max File Support</strong>: Transfer large archives and media up to 1 Terabyte.</li>
-              </ul>
-            </div>
+            </button>
+
+            <button class="variant-animated-tab" data-variant="dev">
+              <span class="tab-icon">💻</span>
+              <div class="tab-label-group">
+                <span class="tab-name">Connect for Coders</span>
+                <span class="tab-sub">Monokai IDE Environment</span>
+              </div>
+            </button>
+
+            <button class="variant-animated-tab" data-variant="design">
+              <span class="tab-icon">🎨</span>
+              <div class="tab-label-group">
+                <span class="tab-name">Connect for Designers</span>
+                <span class="tab-sub">Human Design Canvas</span>
+              </div>
+            </button>
           </div>
         </section>
 
@@ -230,10 +240,21 @@
 
         <!-- PROFESSIONAL ULTRA-SLEEK CONNECT FOOTER -->
         <footer class="showcase-footer">
+          <!-- FOOTER THREE.JS ORB SCRAMBLER EXPERIENCE -->
+          <div id="footer-orb-experience" class="footer-orb-experience">
+            <div class="orb-experience-content">
+              <span class="apple-fade-subtitle">EXPERIENCE THE FUTURE OF PRIVACY</span>
+              <button id="scramble-text-btn" class="scramble-text-btn" title="Click to Enter Connect's World">
+                <span id="matrix-scramble-output">0x9F4A7B2C8D1E</span>
+              </button>
+              <span class="orb-hint-text">Hover to decipher • Click to open Connect variants</span>
+            </div>
+          </div>
+
           <div class="footer-top-grid">
             <div class="footer-col-brand">
               <div class="showcase-brand" style="margin-bottom:12px;">
-                <span class="showcase-logo-dot"></span>
+                <img src="/logo.svg" alt="Connect official logo" width="28" height="28" style="filter:drop-shadow(0 0 8px rgba(96,165,250,0.5));">
                 <span class="showcase-logo-text">connect</span>
               </div>
               <p class="footer-brand-desc">Zero-trace ephemeral & persistent communications suite. Built for privacy, speed, and real active user connection across any device.</p>
@@ -244,12 +265,11 @@
             </div>
 
             <div class="footer-col-links">
-              <h4>PLATFORM</h4>
+              <h4>CONNECT VARIANTS</h4>
               <ul>
-                <li><a href="#section-tour-details">Guided Tour</a></li>
-                <li><a href="#section-changelog">Active Live Change Log</a></li>
-                <li><a href="#" id="link-footer-login">Log In</a></li>
-                <li><a href="#" id="link-footer-signup">Sign Up</a></li>
+                <li><a href="#" id="link-variant-std">⚡ Just Connect Standard</a></li>
+                <li><a href="#" id="link-variant-dev">💻 Connect for Coders</a></li>
+                <li><a href="#" id="link-variant-design">🎨 Connect for Designers</a></li>
               </ul>
             </div>
 
@@ -280,6 +300,63 @@
         </footer>
       </div>
     </section>
+
+    <!-- Programmers Code Evaluator Console Modal -->
+    <div id="modal-dev-editor" class="auth-modal hidden">
+      <div class="auth-modal-card" style="max-width:540px;">
+        <button id="btn-close-dev-editor" class="auth-close-btn">✕</button>
+
+        <div class="auth-modal-header">
+          <h2>💻 Programmers IDE Console</h2>
+          <p>Write & execute live JavaScript snippets directly in room session.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">JavaScript Code Snippet</label>
+          <textarea id="dev-code-input" class="input-field" style="height:120px; font-family:var(--font-mono); font-size:0.85rem; padding:10px; resize:none;" placeholder="// Write JavaScript code here...&#10;console.log('Hello from Connect Dev Suite!');"></textarea>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button id="btn-run-dev-code" class="btn btn-primary" style="flex:1;">Run Snippet</button>
+          <button id="btn-share-dev-code" class="btn btn-secondary" style="flex:1;">Share in Chat</button>
+        </div>
+
+        <div id="dev-console-output" class="dev-console-output" style="margin-top:12px; padding:12px; background:#0d1117; border:1px solid var(--border); border-radius:8px; font-family:var(--font-mono); font-size:0.8rem; color:#7ee787; min-height:60px; max-height:140px; overflow-y:auto;">
+          > Console output will appear here...
+        </div>
+      </div>
+    </div>
+
+    <!-- Designers Collaborative Canvas Modal -->
+    <div id="modal-design-canvas" class="auth-modal hidden">
+      <div class="auth-modal-card" style="max-width:500px;">
+        <button id="btn-close-design-canvas" class="auth-close-btn">✕</button>
+
+        <div class="auth-modal-header">
+          <h2>🎨 Designers Whiteboard Canvas</h2>
+          <p>Sketch ideas, generate color palettes, and share live design assets.</p>
+        </div>
+
+        <div class="design-canvas-wrapper" style="border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#18181b;">
+          <canvas id="design-whiteboard-canvas" width="460" height="240" style="width:100%; height:240px; cursor:crosshair; background:#18181b;"></canvas>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <div id="design-palette-row" class="banner-color-options">
+            <span class="banner-swatch active" data-canvas-color="#3b82f6" style="background:#3b82f6;"></span>
+            <span class="banner-swatch" data-canvas-color="#f43f5e" style="background:#f43f5e;"></span>
+            <span class="banner-swatch" data-canvas-color="#10b981" style="background:#10b981;"></span>
+            <span class="banner-swatch" data-canvas-color="#f59e0b" style="background:#f59e0b;"></span>
+            <span class="banner-swatch" data-canvas-color="#ffffff" style="background:#ffffff;"></span>
+          </div>
+
+          <div style="display:flex; gap:6px;">
+            <button id="btn-clear-canvas" class="btn btn-ghost" style="height:32px; font-size:0.75rem; padding:0 8px;">Clear</button>
+            <button id="btn-share-canvas" class="btn btn-primary" style="height:32px; font-size:0.75rem; padding:0 12px;">Share Canvas</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Direct Landing Page Log In / Sign Up Modal -->
     <div id="modal-auth-landing" class="auth-modal hidden">
@@ -331,7 +408,7 @@
     <section id="view-landing" class="view">
       <header class="landing-top-bar">
         <div class="showcase-brand">
-          <span class="showcase-logo-dot"></span>
+          <img src="/logo.svg" alt="Connect official logo" width="28" height="28" style="filter:drop-shadow(0 0 8px rgba(96,165,250,0.5));">
           <span class="showcase-logo-text">connect</span>
         </div>
         <div class="top-bar-right">
@@ -359,8 +436,11 @@
 
       <div class="landing-content">
         <header class="landing-header">
-          <h1 class="logo">connect</h1>
-          <p class="tagline">ephemeral private & persistent public rooms</p>
+          <div style="display:flex; align-items:center; justify-content:center; gap:10px;">
+            <img src="/logo.svg" alt="Connect logo" width="48" height="48" style="filter:drop-shadow(0 0 16px rgba(96,165,250,0.6));">
+            <h1 class="logo">connect</h1>
+          </div>
+          <p id="landing-tagline-edition" class="tagline">ephemeral private & persistent public rooms</p>
         </header>
 
         <!-- Two Sections for Creating Room Codes: Private vs Public -->
@@ -418,6 +498,22 @@
         </div>
       </div>
     </section>
+
+    <!-- Room Participants Drawer Modal -->
+    <div id="modal-room-members" class="auth-modal hidden">
+      <div class="auth-modal-card" style="max-width:440px;">
+        <button id="btn-close-room-members" class="auth-close-btn">✕</button>
+
+        <div class="auth-modal-header">
+          <h2>Room Participants & Peers</h2>
+          <p>Real-time connected users in this room session.</p>
+        </div>
+
+        <div id="room-members-list-container" class="friends-list-container">
+          <!-- Dynamic Connected Room Members -->
+        </div>
+      </div>
+    </div>
 
     <!-- Create Public Code Modal -->
     <div id="modal-create-public-room" class="auth-modal hidden">
@@ -617,6 +713,18 @@
         </div>
 
         <div class="chat-header-right">
+          <button id="btn-open-dev-tools" class="btn-icon edition-feature-btn dev-only" title="IDE Code Evaluator Console">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7ee787" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </button>
+
+          <button id="btn-open-design-tools" class="btn-icon edition-feature-btn design-only" title="Collaborative Whiteboard Canvas">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f472b6" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          </button>
+
+          <button id="btn-members-drawer" class="btn-icon" title="Connected Room Members">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </button>
+
           <button id="btn-invite-friends-chat" class="btn btn-secondary" style="height:32px; font-size:0.75rem; padding:0 8px;" title="Invite Friends">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
             <span>Invite</span>
@@ -645,6 +753,13 @@
         <div id="messages-list" class="messages-list"></div>
       </div>
 
+      <!-- AUDIENCE STATUS BAR FOR CHAT VIEW -->
+      <div id="audience-chat-status-bar" class="audience-chat-status-bar">
+        <span class="status-bar-text dev-only">UTF-8 | Git: main | 0 Compilation Errors | Node v20.11</span>
+        <span class="status-bar-text design-only">Canvas: 60 FPS | Display P3 | Auto-Layout: Enabled | Rulers On</span>
+        <span class="status-bar-text standard-only">Zero-Trace Encrypted Channel • 1 TB Attachments Active</span>
+      </div>
+
       <footer class="chat-input-bar">
         <!-- MOBILE-OPTIMIZED UPWARD-EXPANDING EXPRESSION TOOLS DROPDOWN MENU -->
         <div class="tools-menu-wrapper">
@@ -657,6 +772,11 @@
             <div class="tools-dropdown-header">
               <span>EXPRESSION & ATTACHMENT TOOLS</span>
             </div>
+
+            <button id="btn-record-voice-note" class="tools-dropdown-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              <span>Record Voice Note</span>
+            </button>
 
             <label for="input-photo-upload" class="tools-dropdown-item">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -740,6 +860,14 @@
           </div>
         </div>
 
+        <div class="settings-section">
+          <h3>Zero-Trace Security Vault</h3>
+          <div style="display:flex; gap:10px;">
+            <button id="btn-export-vault" class="btn btn-secondary" style="flex:1;">Export Vault Backup</button>
+            <button id="btn-panic-wipe" class="btn btn-danger-text" style="flex:1; height:46px;">⚡ 1-Click Panic Wipe</button>
+          </div>
+        </div>
+
         <div class="settings-footer-actions">
           <button id="btn-save-fullscreen-settings" class="btn btn-primary" style="width:100%; height:48px;">Apply & Save Preferences</button>
         </div>
@@ -758,6 +886,51 @@
         <p class="overlay-title">session ended</p>
         <p id="overlay-subtitle-desc" class="overlay-subtitle">all private room messages destroyed</p>
         <button id="btn-return-home" class="btn btn-primary">return to main hub</button>
+      </div>
+    </div>
+
+    <!-- ENTER CONNECT'S WORLD VARIANT DRAWER MODAL -->
+    <div id="modal-connect-world-panel" class="auth-modal hidden">
+      <div class="auth-modal-card" style="max-width:560px; background:rgba(14,14,20,0.95); backdrop-filter:blur(30px); border-color:rgba(96,165,250,0.4);">
+        <button id="btn-close-world-panel" class="auth-close-btn">✕</button>
+
+        <div class="auth-modal-header" style="text-align:center;">
+          <div style="font-size:2.4rem; margin-bottom:4px;">🔮</div>
+          <h2 style="font-size:1.4rem; font-weight:800; background:linear-gradient(135deg,#60a5fa,#8b5cf6,#f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Enter Connect's World</h2>
+          <p style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">Select your specialized environment to launch tailored tools & aesthetics.</p>
+        </div>
+
+        <div class="world-variants-list" style="display:flex; flex-direction:column; gap:12px; margin-top:16px;">
+          <!-- Variant Option 1: Standard -->
+          <div class="world-variant-option" data-launch-variant="standard" style="padding:16px 20px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:all var(--transition-fast);">
+            <span style="font-size:1.8rem;">⚡</span>
+            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+              <span style="font-size:1rem; font-weight:700; color:#ffffff;">Just Connect</span>
+              <span style="font-size:0.78rem; color:var(--text-dim);">Standard zero-trace private messaging & persistent public room hubs.</span>
+            </div>
+            <button class="btn btn-secondary" style="height:34px; font-size:0.75rem; padding:0 12px;">Launch ⚡</button>
+          </div>
+
+          <!-- Variant Option 2: Coders -->
+          <div class="world-variant-option" data-launch-variant="dev" style="padding:16px 20px; background:rgba(13,17,23,0.8); border:1px solid rgba(48,54,61,0.9); border-radius:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:all var(--transition-fast);">
+            <span style="font-size:1.8rem;">💻</span>
+            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+              <span style="font-size:1rem; font-weight:700; color:#7ee787; font-family:var(--font-mono);">Connect for Coders</span>
+              <span style="font-size:0.78rem; color:var(--text-dim);">Monokai IDE environment with live JS code evaluator & syntax highlighting.</span>
+            </div>
+            <button class="btn btn-primary" style="height:34px; font-size:0.75rem; padding:0 12px; background:#7ee787; color:#0d1117; font-weight:700;">Launch 💻</button>
+          </div>
+
+          <!-- Variant Option 3: Designers -->
+          <div class="world-variant-option" data-launch-variant="design" style="padding:16px 20px; background:rgba(26,22,35,0.8); border:1px solid rgba(236,72,153,0.3); border-radius:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:all var(--transition-fast);">
+            <span style="font-size:1.8rem;">🎨</span>
+            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+              <span style="font-size:1rem; font-weight:700; color:#f472b6;">Connect for Designers</span>
+              <span style="font-size:0.78rem; color:var(--text-dim);">Human Design canvas with collaborative whiteboard & color palette generator.</span>
+            </div>
+            <button class="btn btn-primary" style="height:34px; font-size:0.75rem; padding:0 12px; background:#f472b6; color:#ffffff; font-weight:700;">Launch 🎨</button>
+          </div>
+        </div>
       </div>
     </div>
 

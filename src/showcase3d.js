@@ -5,6 +5,7 @@ let mouseX = 0, mouseY = 0;
 let windowHalfX = window.innerWidth / 2;
 let windowHalfY = window.innerHeight / 2;
 let animationFrameId = null;
+let scrollOffsetY = 0;
 
 export function initThreeShowcase(canvasElement) {
   if (!canvasElement) return;
@@ -13,7 +14,7 @@ export function initThreeShowcase(canvasElement) {
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
   camera.position.z = 500;
 
-  const count = 1200;
+  const count = 1400;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
 
@@ -47,7 +48,7 @@ export function initThreeShowcase(canvasElement) {
     vertexColors: true,
     map: canvasTexture,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.85,
     blending: THREE.AdditiveBlending,
     depthWrite: false
   });
@@ -62,6 +63,17 @@ export function initThreeShowcase(canvasElement) {
   window.addEventListener('resize', onWindowResize);
   document.addEventListener('mousemove', onDocumentMouseMove);
 
+  // Scroll listener for smooth footer orb transition
+  const scrollContainer = document.querySelector(".showcase-scroll-container");
+  if (scrollContainer) {
+    scrollContainer.addEventListener("scroll", () => {
+      const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+      if (maxScroll > 0) {
+        scrollOffsetY = (scrollContainer.scrollTop / maxScroll) * 180;
+      }
+    });
+  }
+
   animate();
 }
 
@@ -73,14 +85,13 @@ function createParticleTexture() {
 
   const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
   gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.3, 'rgba(100,160,255,0.6)');
+  gradient.addColorStop(0.3, 'rgba(96,165,250,0.7)');
   gradient.addColorStop(1, 'rgba(0,0,0,0)');
 
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 64, 64);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
+  return new THREE.CanvasTexture(canvas);
 }
 
 function onDocumentMouseMove(event) {
@@ -102,11 +113,12 @@ function animate() {
   animationFrameId = requestAnimationFrame(animate);
 
   if (particles) {
-    particles.rotation.x += 0.001;
-    particles.rotation.y += 0.0015;
+    particles.rotation.x += 0.0012;
+    particles.rotation.y += 0.0018;
 
-    camera.position.x += (mouseX - camera.position.x) * 0.03;
-    camera.position.y += (-mouseY - camera.position.y) * 0.03;
+    const targetY = -mouseY - scrollOffsetY;
+    camera.position.x += (mouseX - camera.position.x) * 0.035;
+    camera.position.y += (targetY - camera.position.y) * 0.035;
     camera.lookAt(scene.position);
   }
 

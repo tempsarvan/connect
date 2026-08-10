@@ -35,6 +35,11 @@ import {
 } from "./cleanup";
 import { processImageFile } from "./media";
 import { generateQRCodeSVG } from "./qrcode";
+import { startVoiceRecording, stopVoiceRecording } from "./audio";
+import { exportVaultBackup, panicWipeAllData } from "./vault";
+import { runJavaScriptSnippet } from "./devSuite";
+import { initDesignCanvas, generateColorPalette } from "./designSuite";
+import { triggerVariantTransition } from "./variantTransitions";
 import { 
   views, 
   buttons, 
@@ -48,24 +53,33 @@ import {
   renderFriendsList,
   renderInviteFriendsList,
   renderSavedPublicRooms,
+  renderRoomMembers,
   openProfileCardModal,
   closeLightbox
 } from "./ui";
 import { initThreeShowcase } from "./showcase3d";
 
+import { MatrixScrambler } from "./matrixScrambler";
+
 let currentRoomCode = null;
 let isCurrentRoomPublic = false;
 let currentPublicRoomInfo = null;
+let currentRoomMembersList = [];
 
 let currentUid = null;
 let roomUnsubscribe = null;
 let chatUnsubscribe = null;
 let currentAuthMode = "signup";
 let selectedBannerColor = getProfileBannerColor();
-let selectedDeviceMode = "computer"; // "computer", "tablet", "phone"
+let selectedDeviceMode = "computer";
+let isRecordingVoice = false;
+let currentEdition = "standard";
+let designCanvasControls = null;
+let matrixScramblerInstance = null;
 
 async function init() {
   setupEventListeners();
+  setupEditionSwitcher();
 
   try {
     currentUid = await initAuth();
@@ -77,9 +91,20 @@ async function init() {
     initThreeShowcase(displays.threeBgCanvas);
   }
 
+  // Initialize Matrix Text Scrambler Engine on Footer Button
+  const scrambleTarget = document.getElementById("matrix-scramble-output");
+  if (scrambleTarget) {
+    matrixScramblerInstance = new MatrixScrambler(scrambleTarget, "Enter Connect's World");
+  }
+
   // Auto-join via QR Code Scan Query URL Parameter e.g. ?join=X7K9P2
   const urlParams = new URLSearchParams(window.location.search);
   const qrJoinCode = urlParams.get("join") || urlParams.get("code");
+  const editionParam = urlParams.get("edition");
+
+  if (editionParam) {
+    switchEdition(editionParam);
+  }
 
   if (qrJoinCode && qrJoinCode.length === 6) {
     inputs.code.value = qrJoinCode.toUpperCase();
@@ -104,6 +129,78 @@ async function init() {
 
   updateFriendsUI();
   updateSavedRoomsUI();
+}
+
+function switchEdition(edition) {
+  if (edition === currentEdition) return;
+
+  const oldEdition = currentEdition;
+  triggerVariantTransition(oldEdition, edition, () => {
+    currentEdition = edition;
+    document.body.dataset.edition = edition;
+
+    document.querySelectorAll(".edition-tab").forEach((tab) => {
+      if (tab.dataset.edition === edition) tab.classList.add("active");
+      else tab.classList.remove("active");
+    });
+
+    document.querySelectorAll(".variant-animated-tab").forEach((tab) => {
+      if (tab.dataset.variant === edition) tab.classList.add("active");
+      else tab.classList.remove("active");
+    });
+
+    document.querySelectorAll(".edition-card").forEach((card) => {
+      if (card.dataset.editionSelect === edition) card.classList.add("active");
+      else card.classList.remove("active");
+    });
+
+    const heroBadge = document.getElementById("hero-badge-edition-text");
+    const heroHeadline = document.getElementById("hero-headline-edition");
+    const heroSubtitle = document.getElementById("hero-subtitle-edition");
+    const landingTagline = document.getElementById("landing-tagline-edition");
+
+    if (edition === "dev") {
+      if (heroBadge) heroBadge.textContent = "CONNECT FOR CODERS • MONOKAI IDE SUITE";
+      if (heroHeadline) heroHeadline.innerHTML = "Code together.<br>Ship zero-trace.";
+      if (heroSubtitle) heroSubtitle.textContent = "Built for developers & coders. Experience live JS evaluator console, syntax highlighting, Git snippet sharing, and 1 TB archives.";
+      if (landingTagline) landingTagline.textContent = "programmer IDE chat & live code execution suite";
+      showToast("Switched to Connect for Coders edition 💻");
+    } else if (edition === "design") {
+      if (heroBadge) heroBadge.textContent = "CONNECT FOR DESIGNERS • CANVAS SUITE";
+      if (heroHeadline) heroHeadline.innerHTML = "Design together.<br>Canvas whiteboards.";
+      if (heroSubtitle) heroSubtitle.textContent = "Built for designers & creators. Experience collaborative whiteboard canvas, color palette generators, and HSL moodboards.";
+      if (landingTagline) landingTagline.textContent = "designer whiteboard canvas & moodboard suite";
+      showToast("Switched to Connect for Designers edition 🎨");
+    } else {
+      if (heroBadge) heroBadge.textContent = "ZERO-TRACE EPHEMERAL & PERSISTENT SUITE";
+      if (heroHeadline) heroHeadline.innerHTML = "Talk freely.<br>Leave no trace.";
+      if (heroSubtitle) heroSubtitle.textContent = "Connect is a hybrid communications suite engineered for phone, tablet, and desktop. Experience 6-digit private & public room codes, instant device QR pairing, unique handle protection, and 1 TB file support.";
+      if (landingTagline) landingTagline.textContent = "ephemeral private & persistent public rooms";
+      showToast("Switched to Just Connect Standard edition ⚡");
+    }
+  });
+}
+
+function setupEditionSwitcher() {
+  document.querySelectorAll(".edition-tab").forEach((btn) => {
+    btn.addEventListener("click", () => switchEdition(btn.dataset.edition));
+  });
+
+  document.querySelectorAll(".variant-animated-tab").forEach((btn) => {
+    btn.addEventListener("click", () => switchEdition(btn.dataset.variant));
+  });
+
+  document.querySelectorAll(".btn-select-edition").forEach((btn) => {
+    btn.addEventListener("click", () => switchEdition(btn.dataset.editionSelect));
+  });
+
+  document.getElementById("link-edition-std")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("standard"); });
+  document.getElementById("link-edition-dev")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("dev"); });
+  document.getElementById("link-edition-design")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("design"); });
+
+  document.getElementById("link-variant-std")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("standard"); });
+  document.getElementById("link-variant-dev")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("dev"); });
+  document.getElementById("link-variant-design")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("design"); });
 }
 
 function enterConnectApp() {
@@ -212,11 +309,14 @@ function updateDevicePairingUI() {
     if (selectedDeviceMode === "tablet") buttons.deviceTablet.classList.add("active");
     if (selectedDeviceMode === "phone") buttons.devicePhone.classList.add("active");
 
-    if (currentRoomCode) {
-      const joinUrl = `${window.location.origin}/?join=${currentRoomCode}`;
-      displays.qrCodeVectorContainer.innerHTML = generateQRCodeSVG(joinUrl, 180);
-      displays.qrCodeDisplayWrapper.classList.remove("hidden");
-    }
+    displays.qrCodeVectorContainer.innerHTML = `
+      <div class="wip-notice-card" style="padding:24px 16px; text-align:center; background:rgba(18,18,24,0.85); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.15); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.5); max-width:280px; margin:0 auto;">
+        <div style="font-size:2rem; margin-bottom:8px;">🚧</div>
+        <h4 style="color:#ffffff; font-size:0.95rem; font-weight:700; letter-spacing:-0.01em;">Work In Progress</h4>
+        <p style="color:var(--text-muted); font-size:0.78rem; margin-top:6px; line-height:1.5;">${selectedDeviceMode === "phone" ? "Phone" : "Tablet"} device pairing is under active development. Please enter the 6-digit room code directly on your device!</p>
+      </div>
+    `;
+    displays.qrCodeDisplayWrapper.classList.remove("hidden");
   }
 }
 
@@ -300,6 +400,138 @@ function updateFriendsUI() {
 }
 
 function setupEventListeners() {
+  // Enter Connect's World Matrix Scrambler Button Handler
+  document.getElementById("scramble-text-btn")?.addEventListener("click", () => {
+    document.getElementById("modal-connect-world-panel")?.classList.remove("hidden");
+  });
+
+  document.getElementById("btn-close-world-panel")?.addEventListener("click", () => {
+    document.getElementById("modal-connect-world-panel")?.classList.add("hidden");
+  });
+
+  document.querySelectorAll(".world-variant-option").forEach((card) => {
+    card.addEventListener("click", () => {
+      const variant = card.dataset.launchVariant;
+      switchEdition(variant);
+      document.getElementById("modal-connect-world-panel")?.classList.add("hidden");
+      enterConnectApp();
+    });
+  });
+
+  // Dev & Design Tools Modal Triggers
+  document.getElementById("btn-open-dev-tools")?.addEventListener("click", () => {
+    document.getElementById("modal-dev-editor")?.classList.remove("hidden");
+  });
+  document.getElementById("btn-close-dev-editor")?.addEventListener("click", () => {
+    document.getElementById("modal-dev-editor")?.classList.add("hidden");
+  });
+
+  document.getElementById("btn-run-dev-code")?.addEventListener("click", () => {
+    const code = document.getElementById("dev-code-input").value;
+    const res = runJavaScriptSnippet(code);
+    const out = document.getElementById("dev-console-output");
+    if (res.success) {
+      out.textContent = `> Output: ${res.logs.join("\n") || res.result || "Executed cleanly"}`;
+      out.style.color = "#7ee787";
+    } else {
+      out.textContent = `> Error: ${res.error}`;
+      out.style.color = "#f85149";
+    }
+  });
+
+  document.getElementById("btn-share-dev-code")?.addEventListener("click", async () => {
+    const code = document.getElementById("dev-code-input").value.trim();
+    if (code && currentRoomCode) {
+      await sendMessage(currentRoomCode, currentUid, {
+        text: `\`\`\`js\n${code}\n\`\`\``,
+        mediaType: "text"
+      });
+      document.getElementById("modal-dev-editor")?.classList.add("hidden");
+      showToast("Shared Code Snippet in chat!");
+    }
+  });
+
+  document.getElementById("btn-open-design-tools")?.addEventListener("click", () => {
+    const modal = document.getElementById("modal-design-canvas");
+    modal?.classList.remove("hidden");
+    const canvas = document.getElementById("design-whiteboard-canvas");
+    if (canvas && !designCanvasControls) {
+      designCanvasControls = initDesignCanvas(canvas);
+    }
+  });
+  document.getElementById("btn-close-design-canvas")?.addEventListener("click", () => {
+    document.getElementById("modal-design-canvas")?.classList.add("hidden");
+  });
+
+  document.getElementById("btn-clear-canvas")?.addEventListener("click", () => {
+    if (designCanvasControls) designCanvasControls.clear();
+  });
+
+  document.getElementById("btn-share-canvas")?.addEventListener("click", async () => {
+    if (designCanvasControls && currentRoomCode) {
+      const dataUrl = designCanvasControls.exportPNG();
+      await sendMessage(currentRoomCode, currentUid, {
+        text: "🎨 Canvas Whiteboard Sketch",
+        mediaType: "image",
+        mediaUrl: dataUrl
+      });
+      document.getElementById("modal-design-canvas")?.classList.add("hidden");
+      showToast("Shared Canvas Sketch in chat!");
+    }
+  });
+
+  document.querySelectorAll("[data-canvas-color]").forEach((swatch) => {
+    swatch.addEventListener("click", () => {
+      const color = swatch.dataset.canvasColor;
+      if (designCanvasControls) designCanvasControls.setColor(color);
+      showToast(`Selected canvas color: ${color}`);
+    });
+  });
+
+  // Voice Recording Toggle
+  buttons.recordVoiceNote?.addEventListener("click", async () => {
+    displays.dropdownToolsMenu.classList.add("hidden");
+    if (!isRecordingVoice) {
+      isRecordingVoice = true;
+      showToast("🎙️ Recording Voice Note... Tap again to send!");
+      await startVoiceRecording();
+    } else {
+      isRecordingVoice = false;
+      showToast("Processing Voice Note...");
+      const audioUrl = await stopVoiceRecording();
+      if (audioUrl && currentRoomCode) {
+        await sendMessage(currentRoomCode, currentUid, {
+          text: "🎙️ Voice Note",
+          mediaType: "audio",
+          mediaUrl: audioUrl
+        });
+        showToast("Voice Note sent!");
+      }
+    }
+  });
+
+  // Room Member Drawer
+  buttons.membersDrawer?.addEventListener("click", () => {
+    renderRoomMembers(currentRoomMembersList);
+    displays.modalRoomMembers.classList.remove("hidden");
+  });
+
+  buttons.closeRoomMembers?.addEventListener("click", () => {
+    displays.modalRoomMembers.classList.add("hidden");
+  });
+
+  // Panic Wipe & Vault Export
+  buttons.panicWipe?.addEventListener("click", () => {
+    if (confirm("⚡ Are you sure you want to 1-Click Panic Wipe all local memory, cookies, and tokens?")) {
+      panicWipeAllData();
+    }
+  });
+
+  buttons.exportVault?.addEventListener("click", () => {
+    exportVaultBackup();
+    showToast("Vault Backup downloaded!");
+  });
+
   // Device QR Code Pairing Tabs
   buttons.deviceComputer?.addEventListener("click", () => {
     selectedDeviceMode = "computer";
@@ -628,6 +860,9 @@ async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = n
 
     if (roomUnsubscribe) roomUnsubscribe();
     roomUnsubscribe = listenToRoom(roomCode, (roomData) => {
+      if (roomData && roomData.members) {
+        currentRoomMembersList = roomData.members;
+      }
       if (!roomData || roomData.status === "ended") {
         if (views.chat.classList.contains("active") || views.waiting.classList.contains("active")) {
           onSessionEnded();
@@ -689,6 +924,9 @@ function startChatSession() {
 
   if (roomUnsubscribe) roomUnsubscribe();
   roomUnsubscribe = listenToRoom(currentRoomCode, (roomData) => {
+    if (roomData && roomData.members) {
+      currentRoomMembersList = roomData.members;
+    }
     if (!roomData || roomData.status === "ended") {
       onSessionEnded();
     }
@@ -743,6 +981,7 @@ function resetAppState() {
   currentRoomCode = null;
   isCurrentRoomPublic = false;
   currentPublicRoomInfo = null;
+  currentRoomMembersList = [];
   
   if (roomUnsubscribe) {
     roomUnsubscribe();

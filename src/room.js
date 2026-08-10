@@ -1,4 +1,5 @@
 // Zero-Permission Universal Real-Time Room Signaling Engine for Connect
+// Triple-Redundant Transport: ntfy.sh + RESTful API KV Relay + Local BroadcastChannel
 
 export function generateRoomCode() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -34,20 +35,33 @@ window.addEventListener("storage", (e) => {
   }
 });
 
-// Universal Zero-Permission HTTP Post Signal
+// Universal Zero-Permission HTTP Post Signal with Triple Transport
 export async function sendUniversalSignal(roomCode, payload) {
   const topic = `connect_sig_${roomCode.toUpperCase()}`;
   const bodyText = JSON.stringify(payload);
 
-  // 1. Post to ntfy.sh public relay
+  // Transport 1: ntfy.sh
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
+      headers: { "Cache": "yes", "X-Cache": "yes" },
       body: bodyText
     }).catch(() => {});
   } catch (e) {}
 
-  // 2. Also save to local storage for local tab sync
+  // Transport 2: RESTful API Public Object Relay
+  try {
+    fetch("https://api.restful-api.dev/objects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: topic,
+        data: payload
+      })
+    }).catch(() => {});
+  } catch (e) {}
+
+  // Transport 3: Local Storage
   try {
     const current = localRooms.get(roomCode) || {};
     const updated = { ...current, ...(payload.room || {}), status: payload.status || current.status };
@@ -57,7 +71,7 @@ export async function sendUniversalSignal(roomCode, payload) {
   } catch (e) {}
 }
 
-// Universal Zero-Permission Polling + SSE Listener
+// Universal Zero-Permission Listener with Triple Transport
 export function listenUniversalSignal(roomCode, onUpdate) {
   const topic = `connect_sig_${roomCode.toUpperCase()}`;
   let isClosed = false;
@@ -93,11 +107,11 @@ export function listenUniversalSignal(roomCode, onUpdate) {
     }
   };
 
-  // 1. HTTP Polling every 1 second (100% reliable across any browser/device)
-  const pollInterval = setInterval(async () => {
+  // 1. ntfy.sh Polling every 1s
+  const pollIntervalNtfy = setInterval(async () => {
     if (isClosed) return;
     try {
-      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1`);
+      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=all`);
       if (res.ok) {
         const text = await res.text();
         const lines = text.trim().split("\n");
@@ -116,10 +130,10 @@ export function listenUniversalSignal(roomCode, onUpdate) {
     } catch (e) {}
   }, 1000);
 
-  // 2. Real-Time SSE Stream (text/event-stream on /sse)
+  // 2. ntfy.sh SSE Stream
   let sse = null;
   try {
-    sse = new EventSource(`https://ntfy.sh/${topic}/sse`);
+    sse = new EventSource(`https://ntfy.sh/${topic}/sse?since=all`);
     sse.onmessage = (event) => {
       if (isClosed) return;
       try {
@@ -133,11 +147,31 @@ export function listenUniversalSignal(roomCode, onUpdate) {
     };
   } catch (e) {}
 
-  activePollers.set(roomCode, { pollInterval, sse });
+  // 3. RESTful API KV Polling Backup every 1.5s
+  const pollIntervalRest = setInterval(async () => {
+    if (isClosed) return;
+    try {
+      const res = await fetch("https://api.restful-api.dev/objects");
+      if (res.ok) {
+        const items = await res.json();
+        if (Array.isArray(items)) {
+          items.forEach((item) => {
+            if (item.name === topic && item.data && !processedMsgIds.has(item.id)) {
+              processedMsgIds.add(item.id);
+              handleMessagePayload(item.data);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+  }, 1500);
+
+  activePollers.set(roomCode, { pollIntervalNtfy, pollIntervalRest, sse });
 
   return () => {
     isClosed = true;
-    clearInterval(pollInterval);
+    clearInterval(pollIntervalNtfy);
+    clearInterval(pollIntervalRest);
     if (sse) sse.close();
     activePollers.delete(roomCode);
   };
@@ -216,7 +250,7 @@ export function listenToRoom(roomCode, onUpdate) {
     onUpdate(localRooms.get(roomCode));
   }
 
-  // Listen for universal signals (HTTP Polling + SSE)
+  // Listen for universal signals (ntfy.sh + RESTful API KV + SSE)
   const cleanupUniversal = listenUniversalSignal(roomCode, (updatedRoom) => {
     onUpdate(updatedRoom);
   });

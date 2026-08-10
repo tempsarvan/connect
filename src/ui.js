@@ -48,6 +48,11 @@ export const buttons = {
   endSession: document.getElementById("btn-end-session"),
   send: document.getElementById("btn-send"),
   toolsMenuToggle: document.getElementById("btn-tools-menu-toggle"),
+  recordVoiceNote: document.getElementById("btn-record-voice-note"),
+  membersDrawer: document.getElementById("btn-members-drawer"),
+  closeRoomMembers: document.getElementById("btn-close-room-members"),
+  exportVault: document.getElementById("btn-export-vault"),
+  panicWipe: document.getElementById("btn-panic-wipe"),
   returnHome: document.getElementById("btn-return-home"),
   profileLanding: document.getElementById("btn-profile-landing"),
   profileHeader: document.getElementById("btn-profile-header"),
@@ -86,6 +91,8 @@ export const displays = {
   modalCreatePublicRoom: document.getElementById("modal-create-public-room"),
   modalInviteFriends: document.getElementById("modal-invite-friends"),
   inviteFriendsListContainer: document.getElementById("invite-friends-list-container"),
+  modalRoomMembers: document.getElementById("modal-room-members"),
+  roomMembersListContainer: document.getElementById("room-members-list-container"),
   savedPublicRoomsContainer: document.getElementById("saved-public-rooms-container"),
   savedRoomsCountBadge: document.getElementById("saved-rooms-count-badge"),
   dropdownToolsMenu: document.getElementById("dropdown-tools-menu"),
@@ -176,6 +183,26 @@ export function openProfileCardModal(username, isMe = true, onEditClick = null) 
   }
 
   displays.modalProfileCard.classList.remove("hidden");
+}
+
+export function renderRoomMembers(members) {
+  displays.roomMembersListContainer.innerHTML = "";
+  if (!members || members.length === 0) {
+    displays.roomMembersListContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:0.82rem;">No active participants in room.</div>`;
+    return;
+  }
+
+  members.forEach((uid) => {
+    const card = document.createElement("div");
+    card.className = "friend-card";
+    card.innerHTML = `
+      <div class="friend-info">
+        <span class="friend-name">User ${uid.substring(0, 10)}</span>
+        <span class="friend-status" style="color:#10b981;">🟢 Connected Member</span>
+      </div>
+    `;
+    displays.roomMembersListContainer.appendChild(card);
+  });
 }
 
 export function renderSavedPublicRooms(rooms, onJoinRoom) {
@@ -288,7 +315,13 @@ export function renderMessages(messages, currentUid, targetContainer = displays.
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
 
-    if (msg.mediaType === "file" && msg.mediaUrl) {
+    if (msg.mediaType === "audio" && msg.mediaUrl) {
+      const audioEl = document.createElement("audio");
+      audioEl.controls = true;
+      audioEl.src = msg.mediaUrl;
+      audioEl.style.maxWidth = "240px";
+      bubble.appendChild(audioEl);
+    } else if (msg.mediaType === "file" && msg.mediaUrl) {
       const card = document.createElement("div");
       card.className = "msg-file-card";
       card.innerHTML = `

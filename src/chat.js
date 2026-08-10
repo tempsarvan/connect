@@ -1,4 +1,4 @@
-// Zero-Permission Universal Chat Bus for Connect
+// Zero-Permission Universal Chat Bus for Connect with WhatsApp-Grade Reactions & Triple-Redundant Transport
 
 let roomChannel = null;
 let globalEventsChannel = null;
@@ -6,7 +6,6 @@ const messageStore = new Map();
 const typingUsers = new Map();
 let typingListeners = new Set();
 let onMessagesUpdatedCallback = null;
-let chatUnsubscribeCleanup = null;
 
 // Persistent Device Session (3 Days Inactivity Expiry Threshold)
 const SESSION_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -293,13 +292,32 @@ function notifyMessages() {
   }
 }
 
-// Zero-Permission Universal Chat Relay over ntfy.sh
+// Zero-Permission Universal Chat Relay with Triple Transport (ntfy.sh + RESTful API KV)
 function publishChatMessage(roomCode, payload) {
   const topic = `connect_msg_${roomCode.toUpperCase()}`;
+  
+  // Transport 1: ntfy.sh
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
+      headers: {
+        "Title": "Connect Message",
+        "Cache": "yes",
+        "X-Cache": "yes"
+      },
       body: JSON.stringify(payload)
+    }).catch(() => {});
+  } catch (e) {}
+
+  // Transport 2: RESTful API Public Object Store
+  try {
+    fetch("https://api.restful-api.dev/objects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: topic,
+        data: payload
+      })
     }).catch(() => {});
   } catch (e) {}
 }
@@ -356,12 +374,36 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
-  // Cross-device ntfy.sh message broadcast
+  // Cross-device broadcast across triple transport layers
   publishChatMessage(roomCode, {
     type: "CHAT_MESSAGE",
     roomCode,
     message: msgObj
   });
+}
+
+// WhatsApp-Grade Message Quick Reactions
+export function toggleMessageReaction(roomCode, messageId, emoji) {
+  const msg = messageStore.get(messageId);
+  if (!msg) return;
+
+  msg.reactions = msg.reactions || {};
+  const currentCount = msg.reactions[emoji] || 0;
+  msg.reactions[emoji] = currentCount + 1;
+
+  messageStore.set(messageId, msg);
+  notifyMessages();
+
+  const payload = {
+    type: "MESSAGE_REACTION",
+    messageId,
+    reactions: msg.reactions
+  };
+
+  if (roomChannel) {
+    roomChannel.postMessage(payload);
+  }
+  publishChatMessage(roomCode, payload);
 }
 
 export function deleteMessage(roomCode, messageId) {
@@ -392,11 +434,18 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
   roomChannel = new BroadcastChannel(`connect_chat_${roomCode}`);
 
   const handleMessagePayload = (data) => {
-    const { type, message, messageId, typingUid, isTyping, textLength } = data || {};
+    const { type, message, messageId, reactions, typingUid, isTyping, textLength } = data || {};
     
     if (type === "CHAT_MESSAGE" && message) {
       if (!messageStore.has(message.id)) {
         messageStore.set(message.id, message);
+        notifyMessages();
+      }
+    } else if (type === "MESSAGE_REACTION" && messageId && reactions) {
+      const msg = messageStore.get(messageId);
+      if (msg) {
+        msg.reactions = reactions;
+        messageStore.set(messageId, msg);
         notifyMessages();
       }
     } else if (type === "DELETE_MESSAGE" && messageId) {
@@ -417,16 +466,16 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
 
   roomChannel.onmessage = (event) => handleMessagePayload(event.data);
 
-  // Universal HTTP Polling + SSE Chat Listener
+  // Universal Triple-Transport Chat Listener
   const topic = `connect_msg_${roomCode.toUpperCase()}`;
   const processedMsgIds = new Set();
   let isClosed = false;
 
-  // 1. Polling every 1 second
-  const pollInterval = setInterval(async () => {
+  // 1. ntfy.sh Polling every 1s (since=all)
+  const pollIntervalNtfy = setInterval(async () => {
     if (isClosed) return;
     try {
-      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1`);
+      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=all`);
       if (res.ok) {
         const text = await res.text();
         const lines = text.trim().split("\n");
@@ -445,10 +494,10 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     } catch (e) {}
   }, 1000);
 
-  // 2. SSE Stream (/sse)
+  // 2. ntfy.sh SSE Stream (/sse?since=all)
   let sse = null;
   try {
-    sse = new EventSource(`https://ntfy.sh/${topic}/sse`);
+    sse = new EventSource(`https://ntfy.sh/${topic}/sse?since=all`);
     sse.onmessage = (event) => {
       if (isClosed) return;
       try {
@@ -462,11 +511,31 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     };
   } catch (e) {}
 
+  // 3. RESTful API KV Polling Backup every 1.5s
+  const pollIntervalRest = setInterval(async () => {
+    if (isClosed) return;
+    try {
+      const res = await fetch("https://api.restful-api.dev/objects");
+      if (res.ok) {
+        const items = await res.json();
+        if (Array.isArray(items)) {
+          items.forEach((item) => {
+            if (item.name === topic && item.data && !processedMsgIds.has(item.id)) {
+              processedMsgIds.add(item.id);
+              handleMessagePayload(item.data);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+  }, 1500);
+
   notifyMessages();
 
   return () => {
     isClosed = true;
-    clearInterval(pollInterval);
+    clearInterval(pollIntervalNtfy);
+    clearInterval(pollIntervalRest);
     if (sse) sse.close();
     if (roomChannel) {
       roomChannel.close();
