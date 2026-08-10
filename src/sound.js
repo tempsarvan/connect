@@ -222,21 +222,39 @@ class SoundEngine {
           osc.stop(now + 1.8);
         });
 
-      } else if (type === "laser") {
-        // Accurate Futuristic Laser Pulse
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(2400, now);
-        osc.frequency.exponentialRampToValueAtTime(90, now + 0.15);
+      } else if (type === "laser" || type === "matrix") {
+        // High-Tech Cyber Matrix Synth Chirp
+        const now = this.ctx.currentTime;
+        const freqs = [1200, 1600, 2200, 2800];
+        freqs.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "square";
+          osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+          gain.gain.setValueAtTime(0.08, now + idx * 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.04 + 0.08);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.04);
+          osc.stop(now + idx * 0.04 + 0.08);
+        });
 
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.15);
+      } else if (type === "chime" || type === "designer") {
+        // Clean Human Designer Pentatonic Chime (Eb5, G5, Bb5, Eb6)
+        const now = this.ctx.currentTime;
+        const freqs = [622.25, 783.99, 932.33, 1244.50];
+        freqs.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+          gain.gain.setValueAtTime(0.12, now + idx * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.0008, now + idx * 0.05 + 0.6);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.05);
+          osc.stop(now + idx * 0.05 + 0.6);
+        });
       }
     } catch (e) {
       console.warn("Sound FX error:", e);

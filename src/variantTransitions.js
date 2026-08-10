@@ -1,24 +1,9 @@
-// Directional Variant Transition Animations for Connect
-// Features: Matrix Rapid Code Waterfall Wipe (Coders) & Vibrant Gradient Mesh Wipe (Designers)
+// High-Fidelity Directional & Dropdown Variant Transitions Engine for Connect
+// Coder Transition: Matrix Digital Rain Canvas Dropdown Curtain
+// Designer Transition: Clean Silk Glassmorphic Spring Dropdown
+import { soundEngine } from "./sound";
 
-const editionOrder = {
-  standard: 0,
-  dev: 1,
-  design: 2
-};
-
-const matrixCodeLines = [
-  "const room = new EphemeralStream({ zeroTrace: true });",
-  "$ connect init --variant=coders --speed=fast",
-  "0101101010010101011010010101011010101",
-  "function decipher(payload) { return AES_GCM.decrypt(payload); }",
-  "0x9F4A7B2C8D1E3F • 0 Compilation Errors",
-  "import { MatrixCipher } from '@connect/core';",
-  "await room.handshake({ cache: 'yes', poll: 1 });",
-  "01100110011001100110011001100110",
-  "git commit -m 'Deploying zero-trace channel'",
-  "process.env.ZERO_LOGS = 'true';"
-];
+let activeMatrixCanvasAnimId = null;
 
 export function triggerVariantTransition(fromEdition, toEdition, callback) {
   const overlay = document.getElementById("variant-transition-overlay");
@@ -27,53 +12,73 @@ export function triggerVariantTransition(fromEdition, toEdition, callback) {
     return;
   }
 
-  const fromIdx = editionOrder[fromEdition] !== undefined ? editionOrder[fromEdition] : 0;
-  const toIdx = editionOrder[toEdition] !== undefined ? editionOrder[toEdition] : 0;
-  const direction = toIdx >= fromIdx ? "l2r" : "r2l";
+  // Cancel any ongoing Matrix Canvas loop
+  if (activeMatrixCanvasAnimId) {
+    cancelAnimationFrame(activeMatrixCanvasAnimId);
+    activeMatrixCanvasAnimId = null;
+  }
 
+  overlay.className = "variant-transition-overlay";
   let overlayHTML = "";
 
   if (toEdition === "dev") {
-    // Matrix Code Waterfall Wipe
-    let columns = "";
-    for (let i = 0; i < 12; i++) {
-      const line1 = matrixCodeLines[Math.floor(Math.random() * matrixCodeLines.length)];
-      const line2 = matrixCodeLines[Math.floor(Math.random() * matrixCodeLines.length)];
-      const line3 = matrixCodeLines[Math.floor(Math.random() * matrixCodeLines.length)];
-      const delay = (i * 40) + "ms";
-      columns += `
-        <div class="matrix-code-column" style="animation-delay: ${delay};">
-          <span class="matrix-line">${line1}</span>
-          <span class="matrix-line">${line2}</span>
-          <span class="matrix-line">${line3}</span>
-        </div>
-      `;
-    }
+    // Play Cyber Matrix Synth Sound
+    soundEngine.playSoundFX("matrix");
 
+    // Coders Matrix Dropdown Animation Curtain
     overlayHTML = `
-      <div class="transition-curtain dev-matrix-wipe ${direction}">
-        <div class="matrix-rain-container">
-          ${columns}
+      <div class="transition-curtain dev-matrix-dropdown-curtain curtain-dropdown-anim">
+        <canvas id="matrix-dropdown-canvas" class="matrix-dropdown-canvas"></canvas>
+        <div class="matrix-scanline-laser"></div>
+        <div class="matrix-dropdown-content">
+          <div class="matrix-badge-pill">
+            <span class="matrix-badge-glow-dot"></span>
+            <span>💻 CONNECT FOR CODERS</span>
+          </div>
+          <h2 class="matrix-dropdown-title">MONOKAI IDE SUITE</h2>
+          <div class="matrix-terminal-prompt">
+            <span class="matrix-prompt-symbol">&gt;</span> switch_edition --variant=coders --matrix-drop=true
+          </div>
         </div>
       </div>
     `;
   } else if (toEdition === "design") {
-    // Vibrant Mesh Gradient Wipe
+    // Play Clean Designer Pentatonic Chime
+    soundEngine.playSoundFX("designer");
+
+    // Clean Designer Transition Curtain
     overlayHTML = `
-      <div class="transition-curtain design-gradient-wipe ${direction}">
-        <div class="gradient-wipe-reflection"></div>
-        <div class="gradient-wipe-content">
-          <span class="gradient-wipe-badge">🎨 CONNECT FOR DESIGNERS</span>
-          <span class="gradient-wipe-title">DISPLAY P3 • HUMAN DESIGN SUITE</span>
+      <div class="transition-curtain design-clean-curtain curtain-dropdown-anim">
+        <div class="design-ambient-mesh"></div>
+        <div class="design-clean-glass-card">
+          <div class="design-badge-pill">
+            <span class="design-badge-sparkle">✨</span>
+            <span>CONNECT FOR DESIGNERS</span>
+          </div>
+          <h2 class="design-clean-title">DISPLAY P3 • HUMAN DESIGN SUITE</h2>
+          <div class="design-swatches-cascade">
+            <div class="swatch-chip s-rose" style="--delay:0ms;"><span class="swatch-dot"></span>#f43f5e</div>
+            <div class="swatch-chip s-violet" style="--delay:50ms;"><span class="swatch-dot"></span>#8b5cf6</div>
+            <div class="swatch-chip s-cyan" style="--delay:100ms;"><span class="swatch-dot"></span>#06b6d4</div>
+            <div class="swatch-chip s-emerald" style="--delay:150ms;"><span class="swatch-dot"></span>#10b981</div>
+            <div class="swatch-chip s-amber" style="--delay:200ms;"><span class="swatch-dot"></span>#f59e0b</div>
+          </div>
         </div>
+        <div class="design-glass-sheen"></div>
       </div>
     `;
   } else {
-    // Just Connect Standard Sweep
+    // Just Connect Standard Sleek Sweep
+    soundEngine.playSoundFX("bell");
+
     overlayHTML = `
-      <div class="transition-curtain standard-curtain ${direction}">
-        <div class="standard-wave-wrapper">
-          <span class="standard-label">⚡ JUST CONNECT STANDARD</span>
+      <div class="transition-curtain standard-clean-curtain curtain-dropdown-anim">
+        <div class="standard-ambient-mesh"></div>
+        <div class="standard-glass-card">
+          <div class="standard-badge-pill">
+            <span>⚡ JUST CONNECT STANDARD</span>
+          </div>
+          <h2 class="standard-clean-title">ZERO-TRACE COMMUNICATIONS</h2>
         </div>
       </div>
     `;
@@ -82,12 +87,78 @@ export function triggerVariantTransition(fromEdition, toEdition, callback) {
   overlay.innerHTML = overlayHTML;
   overlay.classList.remove("hidden");
 
+  // If Coder edition, start HTML5 Canvas Matrix Digital Rain Dropdown Engine
+  if (toEdition === "dev") {
+    requestAnimationFrame(() => {
+      const canvas = document.getElementById("matrix-dropdown-canvas");
+      if (canvas) {
+        startMatrixRainEngine(canvas);
+      }
+    });
+  }
+
+  // Trigger state change callback halfway through dropdown animation (~400ms)
   setTimeout(() => {
     if (callback) callback();
-  }, 350);
+  }, 400);
 
+  // Complete animation & cleanup overlay at ~850ms
   setTimeout(() => {
+    if (activeMatrixCanvasAnimId) {
+      cancelAnimationFrame(activeMatrixCanvasAnimId);
+      activeMatrixCanvasAnimId = null;
+    }
     overlay.classList.add("hidden");
     overlay.innerHTML = "";
-  }, 750);
+  }, 850);
+}
+
+function startMatrixRainEngine(canvas) {
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width = window.innerWidth;
+  const height = canvas.height = window.innerHeight;
+
+  const characters = "0123456789ABCDEF!@#$%^&*()_+-=[]{}|;:,.<>?/~$ｦｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜconstfunctionreturnasyncawaitdecrypt";
+  const fontSize = 15;
+  const columns = Math.floor(width / fontSize);
+
+  // Track Y position of drops
+  const drops = [];
+  for (let i = 0; i < columns; i++) {
+    drops[i] = Math.floor(Math.random() * -40); // Start staggered above canvas
+  }
+
+  function draw() {
+    // Translucent black fade to create trails
+    ctx.fillStyle = "rgba(6, 9, 14, 0.18)";
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.font = `${fontSize}px "JetBrains Mono", monospace`;
+
+    for (let i = 0; i < drops.length; i++) {
+      const text = characters[Math.floor(Math.random() * characters.length)];
+      const x = i * fontSize;
+      const y = drops[i] * fontSize;
+
+      // Glow effect for leading green head character
+      ctx.fillStyle = "#FFFFFF";
+      ctx.shadowColor = "#00FF66";
+      ctx.shadowBlur = 12;
+      ctx.fillText(text, x, y);
+
+      // Subsequent matrix trail green character
+      ctx.fillStyle = "#00FF66";
+      ctx.shadowBlur = 0;
+      ctx.fillText(text, x, y - fontSize);
+
+      if (y > height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+      drops[i]++;
+    }
+
+    activeMatrixCanvasAnimId = requestAnimationFrame(draw);
+  }
+
+  draw();
 }
