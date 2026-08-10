@@ -1,5 +1,5 @@
 // Connect Hub Web Desktop OS Platform Manager
-// Floating, draggable, resizable app windows for Connect Messages, Instagram, Discord, YouTube, X, GitHub, Spotify, Canvas & IDE Console
+// Native, zero-block interactive client app windows for Connect Messages, Instagram, Discord, YouTube, X, GitHub, Spotify, Whiteboard & IDE Console
 
 let activeZIndex = 100;
 
@@ -75,7 +75,7 @@ function setupWindowDragging() {
       let left = e.clientX - offsetX;
       let top = e.clientY - offsetY;
 
-      // Keep inside bounds
+      // Keep inside desktop bounds
       left = Math.max(10, Math.min(window.innerWidth - 100, left));
       top = Math.max(36, Math.min(window.innerHeight - 100, top));
 
@@ -95,16 +95,19 @@ function setupWindowDragging() {
     const minBtn = windowEl.querySelector(".win-btn-min");
     const maxBtn = windowEl.querySelector(".win-btn-max");
 
-    closeBtn?.addEventListener("click", () => {
+    closeBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
       const appId = windowEl.dataset.appId;
       closeHubAppWindow(appId);
     });
 
-    minBtn?.addEventListener("click", () => {
+    minBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
       windowEl.classList.add("minimized");
     });
 
-    maxBtn?.addEventListener("click", () => {
+    maxBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
       windowEl.classList.toggle("maximized");
     });
 

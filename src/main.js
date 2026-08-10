@@ -26,9 +26,7 @@ import {
   sendRoomInvitation,
   getFriendKey,
   MAX_FILE_SIZE_BYTES,
-  formatFileSize,
-  setFriendAlias,
-  getFriendAlias
+  formatFileSize
 } from "./chat";
 import { 
   destroyRoomSession, 
@@ -347,6 +345,57 @@ function setupEventListeners() {
       await sendMessage(currentRoomCode, currentUid, { text, mediaType: "text" });
       soundEngine.playMessageDing();
     }
+  });
+
+  // Stickers Picker Handlers
+  buttons.openStickers?.addEventListener("click", () => {
+    displays.dropdownToolsMenu?.classList.add("hidden");
+    displays.modalStickersPicker?.classList.remove("hidden");
+  });
+
+  buttons.closeStickers?.addEventListener("click", () => {
+    displays.modalStickersPicker?.classList.add("hidden");
+  });
+
+  document.querySelectorAll(".sticker-tile").forEach((tile) => {
+    tile.addEventListener("click", async () => {
+      const stickerType = tile.dataset.sticker;
+      if (stickerType && currentRoomCode) {
+        displays.modalStickersPicker?.classList.add("hidden");
+        await sendMessage(currentRoomCode, currentUid, {
+          text: `[Sticker: ${stickerType}]`,
+          mediaType: "text"
+        });
+        soundEngine.playMessageDing();
+        showToast(`Sent ${stickerType} sticker!`);
+      }
+    });
+  });
+
+  // GIFs Picker Handlers
+  buttons.openGifs?.addEventListener("click", () => {
+    displays.dropdownToolsMenu?.classList.add("hidden");
+    displays.modalGifsPicker?.classList.remove("hidden");
+  });
+
+  buttons.closeGifs?.addEventListener("click", () => {
+    displays.modalGifsPicker?.classList.add("hidden");
+  });
+
+  document.querySelectorAll(".gif-tile").forEach((tile) => {
+    tile.addEventListener("click", async () => {
+      const gifUrl = tile.dataset.gifUrl;
+      if (gifUrl && currentRoomCode) {
+        displays.modalGifsPicker?.classList.add("hidden");
+        await sendMessage(currentRoomCode, currentUid, {
+          text: "",
+          mediaType: "image",
+          mediaUrl: gifUrl
+        });
+        soundEngine.playMessageDing();
+        showToast("Sent animated GIF!");
+      }
+    });
   });
 
   // Drawing Whiteboard Tool Handlers
@@ -754,7 +803,7 @@ async function handleGenerateKey(isPublic = false, pubName = null, pubTopic = nu
     }
 
     displays.roomCode.textContent = roomCode;
-    displays.roomTypeBadgeWaiting.textContent = isPublic ? "🌐 Persistent Public Room Key" : "🔒 Ephemeral Private Room Key";
+    displays.roomTypeBadgeWaiting.textContent = isPublic ? "Public Room Key" : "Private Room Key";
 
     soundEngine.playSoundFX("bell");
     showView("waiting");

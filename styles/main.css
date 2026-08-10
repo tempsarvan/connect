@@ -3447,10 +3447,54 @@ body[data-grayscale-scheme="charcoal"] {
   padding: 30px 48px;
   background: rgba(18, 24, 38, 0.85);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(96, 165, 250, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
   text-align: center;
+}
+
+/* Stickers & GIFs Picker Grid Styles */
+.expression-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.sticker-tile {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.sticker-tile:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.gif-tile {
+  width: 100%;
+  height: 90px;
+  border-radius: 12px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.gif-tile:hover {
+  transform: scale(1.08);
+  border-color: #ffffff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
 }
 
 .standard-badge-pill {

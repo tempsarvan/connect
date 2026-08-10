@@ -66,7 +66,11 @@ export const buttons = {
   openDesignTools: document.getElementById("btn-open-design-tools"),
   closeDesignCanvas: document.getElementById("btn-close-design-canvas"),
   clearCanvas: document.getElementById("btn-clear-canvas"),
-  shareCanvas: document.getElementById("btn-share-canvas")
+  shareCanvas: document.getElementById("btn-share-canvas"),
+  openStickers: document.getElementById("btn-open-stickers"),
+  closeStickers: document.getElementById("btn-close-stickers-modal"),
+  openGifs: document.getElementById("btn-open-gifs"),
+  closeGifs: document.getElementById("btn-close-gifs-modal")
 };
 
 export const inputs = {
@@ -121,6 +125,8 @@ export const displays = {
   modalSettingsFullscreen: document.getElementById("modal-settings-fullscreen"),
   modalEditProfile: document.getElementById("modal-edit-profile"),
   modalRoomMembers: document.getElementById("modal-room-members"),
+  modalStickersPicker: document.getElementById("modal-stickers-picker"),
+  modalGifsPicker: document.getElementById("modal-gifs-picker"),
   profileCardHandle: document.getElementById("profile-card-handle"),
   profileCardStatus: document.getElementById("profile-card-status"),
   profileCardBio: document.getElementById("profile-card-bio"),
