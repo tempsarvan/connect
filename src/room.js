@@ -1,5 +1,6 @@
-// Zero-Permission Universal Real-Time Room Signaling Engine for Connect
-// Triple-Redundant Transport: ntfy.sh + RESTful API KV Relay + Local Storage & BroadcastChannel
+// Universal Real-Time Room Signaling Engine for Connect using networkTransceiver
+
+import { broadcastUniversalPayload, listenUniversalPayload } from "./networkTransceiver";
 
 export function generateRoomCode() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -12,7 +13,6 @@ export function generateRoomCode() {
 
 const localRooms = new Map();
 const localRoomListeners = new Map();
-const activePollers = new Map();
 
 function notifyRoomListeners(roomCode, roomData) {
   const listeners = localRoomListeners.get(roomCode);
@@ -35,53 +35,21 @@ window.addEventListener("storage", (e) => {
   }
 });
 
-// Universal Zero-Permission HTTP Post Signal with Quadruple Transport
 export async function sendUniversalSignal(roomCode, payload) {
-  const topic = `connect_sig_${roomCode.trim().toLowerCase()}`;
-  const bodyText = JSON.stringify(payload);
-
-  // Transport 1: ntfy.sh POST
+  const current = localRooms.get(roomCode) || {};
+  const updated = { ...current, ...(payload.room || {}), status: payload.status || current.status };
+  localRooms.set(roomCode, updated);
   try {
-    fetch(`https://ntfy.sh/${topic}`, {
-      method: "POST",
-      headers: { "Cache": "yes", "X-Cache": "yes" },
-      body: bodyText
-    }).catch(() => {});
-  } catch (e) {}
-
-  // Transport 2: RESTful API Public Object Relay
-  try {
-    fetch("https://api.restful-api.dev/objects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: topic,
-        data: payload
-      })
-    }).catch(() => {});
-  } catch (e) {}
-
-  // Transport 3: Local Storage & Memory Broadcast
-  try {
-    const current = localRooms.get(roomCode) || {};
-    const updated = { ...current, ...(payload.room || {}), status: payload.status || current.status };
-    localRooms.set(roomCode, updated);
     localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(updated));
-    localStorage.setItem(`connect_room_signal_${topic}`, JSON.stringify({ payload, timestamp: Date.now() }));
     notifyRoomListeners(roomCode, updated);
   } catch (e) {}
+
+  broadcastUniversalPayload(roomCode, payload);
 }
 
-// Universal Zero-Permission Listener
 export function listenUniversalSignal(roomCode, onUpdate) {
-  const topic = `connect_sig_${roomCode.trim().toLowerCase()}`;
-  let isClosed = false;
-
-  const processedMsgIds = new Set();
-
-  const handleMessagePayload = (data) => {
-    if (isClosed || !data) return;
-
+  const handleSignalPayload = (data) => {
+    if (!data) return;
     const current = localRooms.get(roomCode) || { members: [], status: "waiting" };
 
     if (data.type === "JOIN_REQUEST" || data.type === "ROOM_ACTIVE" || data.type === "ROOM_UPDATED") {
@@ -107,101 +75,10 @@ export function listenUniversalSignal(roomCode, onUpdate) {
     }
   };
 
-  // Storage listener for instant local sync
-  const storageListener = (e) => {
-    if (e.key === `connect_room_signal_${topic}` && e.newValue) {
-      try {
-        const { payload } = JSON.parse(e.newValue);
-        if (payload) handleMessagePayload(payload);
-      } catch (err) {}
-    }
-  };
-  window.addEventListener("storage", storageListener);
-
-  // 1. ntfy.sh Polling every 1s
-  const pollIntervalNtfy = setInterval(async () => {
-    if (isClosed) return;
-    try {
-      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=all`);
-      if (res.ok) {
-        const text = await res.text();
-        const lines = text.trim().split("\n");
-        lines.forEach((line) => {
-          if (!line) return;
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed && parsed.message) {
-              const msgId = parsed.id || JSON.stringify(parsed.message);
-              if (!processedMsgIds.has(msgId)) {
-                processedMsgIds.add(msgId);
-                let payload;
-                if (typeof parsed.message === "object") {
-                  payload = parsed.message;
-                } else {
-                  try { payload = JSON.parse(parsed.message); } catch (e) { payload = parsed.message; }
-                }
-                if (payload) handleMessagePayload(payload);
-              }
-            }
-          } catch (e) {}
-        });
-      }
-    } catch (e) {}
-  }, 1000);
-
-  // 2. ntfy.sh SSE Stream
-  let sse = null;
-  try {
-    sse = new EventSource(`https://ntfy.sh/${topic}/sse?since=all`);
-    sse.onmessage = (event) => {
-      if (isClosed) return;
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed && parsed.message) {
-          const msgId = parsed.id || JSON.stringify(parsed.message);
-          if (!processedMsgIds.has(msgId)) {
-            processedMsgIds.add(msgId);
-            let payload;
-            if (typeof parsed.message === "object") {
-              payload = parsed.message;
-            } else {
-              try { payload = JSON.parse(parsed.message); } catch (e) { payload = parsed.message; }
-            }
-            if (payload) handleMessagePayload(payload);
-          }
-        }
-      } catch (e) {}
-    };
-  } catch (e) {}
-
-  // 3. RESTful API KV Polling Backup every 1.5s
-  const pollIntervalRest = setInterval(async () => {
-    if (isClosed) return;
-    try {
-      const res = await fetch("https://api.restful-api.dev/objects");
-      if (res.ok) {
-        const items = await res.json();
-        if (Array.isArray(items)) {
-          items.forEach((item) => {
-            if (item.name === topic && item.data && !processedMsgIds.has(item.id)) {
-              processedMsgIds.add(item.id);
-              handleMessagePayload(item.data);
-            }
-          });
-        }
-      }
-    } catch (e) {}
-  }, 1500);
-
-  activePollers.set(roomCode, { pollIntervalNtfy, pollIntervalRest, sse });
+  const cleanupTransceiver = listenUniversalPayload(roomCode, "local_uid", false, handleSignalPayload);
 
   return () => {
-    isClosed = true;
-    window.removeEventListener("storage", storageListener);
-    clearInterval(pollIntervalNtfy);
-    clearInterval(pollIntervalRest);
-    if (sse) sse.close();
-    activePollers.delete(roomCode);
+    cleanupTransceiver();
   };
 }
 
@@ -217,7 +94,6 @@ export async function createRoom(roomCode, uid) {
   localRooms.set(roomCode, roomData);
   localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(roomData));
 
-  // Publish room creation signal
   sendUniversalSignal(roomCode, {
     type: "ROOM_CREATED",
     roomCode,
@@ -256,7 +132,6 @@ export async function joinRoom(roomCode, uid) {
   localRooms.set(roomCode, room);
   localStorage.setItem(`connect_room_state_${roomCode}`, JSON.stringify(room));
 
-  // Publish JOIN_REQUEST signal immediately
   sendUniversalSignal(roomCode, {
     type: "JOIN_REQUEST",
     roomCode,
@@ -265,7 +140,6 @@ export async function joinRoom(roomCode, uid) {
     room
   });
 
-  // Re-broadcast JOIN_REQUEST signal every 1.5 seconds to guarantee peer registration
   let retransmits = 0;
   const timer = setInterval(() => {
     retransmits++;
@@ -295,7 +169,6 @@ export function listenToRoom(roomCode, onUpdate) {
     onUpdate(localRooms.get(roomCode));
   }
 
-  // Listen for universal signals
   const cleanupUniversal = listenUniversalSignal(roomCode, (updatedRoom) => {
     onUpdate(updatedRoom);
   });

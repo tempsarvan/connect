@@ -1,9 +1,7 @@
-// Zero-Trace Client-Side AES-GCM Encrypted Chat & Hyper-Redundant Multi-Cloud Relay Engine
+// Zero-Trace Client-Side AES-GCM Encrypted Chat Bus & Zero-Fail Network Transceiver
 
 import { encryptPayload, decryptPayload } from "./cryptoEngine";
-import { initPeerJSTransport, broadcastPeerData } from "./p2pEngine";
-import { db } from "./firebase";
-import { collection, onSnapshot, doc, setDoc } from "firebase/firestore";
+import { broadcastUniversalPayload, listenUniversalPayload } from "./networkTransceiver";
 
 export const MAX_FILE_SIZE_BYTES = 1000 * 1024 * 1024 * 1024; // 1 Terabyte (1 TB)
 
@@ -31,9 +29,6 @@ let globalEventsChannel = null;
 let typingListeners = new Set();
 
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 Hours
-
-const PUBNUB_PUB_KEY = "pub-c-46efd0d9-768a-40a2-9442-990977d4c062";
-const PUBNUB_SUB_KEY = "sub-c-5290b200-a10c-11e1-b851-9319b9909240";
 
 function generateFriendKey() {
   const code = "CN-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Math.floor(10 + Math.random() * 90);
@@ -252,50 +247,8 @@ function notifyMessages() {
   }
 }
 
-// Hyper-Redundant Multi-Cloud Relay Engine (PeerJS STUN + PubNub + Firebase Firestore + ntfy.sh + RESTful API + Local Storage)
 function publishChatMessage(roomCode, payload) {
-  const topic = `connect_msg_${roomCode.trim().toLowerCase()}`;
-  const bodyStr = JSON.stringify(payload);
-
-  // Transport 1: PeerJS WebRTC P2P Direct Mesh (Google STUN)
-  try {
-    broadcastPeerData(payload);
-  } catch (e) {}
-
-  // Transport 2: PubNub Global Network
-  try {
-    fetch(`https://ps.pubnub.com/publish/${PUBNUB_PUB_KEY}/${PUBNUB_SUB_KEY}/0/${topic}/0/${encodeURIComponent(bodyStr)}`).catch(() => {});
-  } catch (e) {}
-
-  // Transport 3: Firebase Cloud Firestore
-  try {
-    const msgId = payload.message?.id || "msg_" + Date.now().toString(36);
-    const msgRef = doc(db, "connect_rooms", topic, "messages", msgId);
-    setDoc(msgRef, { payload: bodyStr, timestamp: Date.now() }).catch(() => {});
-  } catch (e) {}
-
-  // Transport 4: ntfy.sh POST
-  try {
-    fetch(`https://ntfy.sh/${topic}`, {
-      method: "POST",
-      headers: { "Title": "Connect Message", "Cache": "yes", "X-Cache": "yes" },
-      body: bodyStr
-    }).catch(() => {});
-  } catch (e) {}
-
-  // Transport 5: RESTful API Public Object Store
-  try {
-    fetch("https://api.restful-api.dev/objects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: topic, data: payload })
-    }).catch(() => {});
-  } catch (e) {}
-
-  // Transport 6: LocalStorage Event Broadcast
-  try {
-    localStorage.setItem(`connect_msg_event_${topic}`, JSON.stringify({ payload, timestamp: Date.now() }));
-  } catch (e) {}
+  broadcastUniversalPayload(roomCode, payload);
 }
 
 export async function sendMessage(roomCode, uid, payload) {
@@ -356,7 +309,7 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
-  // Cross-device multi-cloud broadcast
+  // Cross-device broadcast
   publishChatMessage(roomCode, {
     type: "CHAT_MESSAGE",
     roomCode,
@@ -460,135 +413,13 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated, isHost = fals
 
   roomChannel.onmessage = (event) => handleMessagePayload(event.data);
 
-  // Initialize PeerJS WebRTC P2P Connection (STUN)
-  const cleanupP2P = initPeerJSTransport(roomCode, uid, isHost, handleMessagePayload);
-
-  // Universal Multi-Cloud Relay Chat Listener
-  const topic = `connect_msg_${roomCode.trim().toLowerCase()}`;
-  const processedMsgIds = new Set();
-  let isClosed = false;
-
-  // LocalStorage Event Listener for instant same-browser cross-window sync
-  const storageListener = (e) => {
-    if (e.key === `connect_msg_event_${topic}` && e.newValue) {
-      try {
-        const { payload } = JSON.parse(e.newValue);
-        if (payload) handleMessagePayload(payload);
-      } catch (err) {}
-    }
-  };
-  window.addEventListener("storage", storageListener);
-
-  // Firestore Realtime Listener
-  let unsubFirestore = null;
-  try {
-    const colRef = collection(db, "connect_rooms", topic, "messages");
-    unsubFirestore = onSnapshot(colRef, (snapshot) => {
-      if (isClosed) return;
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const data = change.doc.data();
-          if (data && data.payload) {
-            try {
-              const payload = typeof data.payload === "string" ? JSON.parse(data.payload) : data.payload;
-              handleMessagePayload(payload);
-            } catch (e) {}
-          }
-        }
-      });
-    }, () => {});
-  } catch (e) {}
-
-  // PubNub Global Polling (1s interval)
-  let pubnubTimeToken = "0";
-  const pollIntervalPubNub = setInterval(async () => {
-    if (isClosed) return;
-    try {
-      const res = await fetch(`https://ps.pubnub.com/v2/subscribe/${PUBNUB_SUB_KEY}/${topic}/0?tt=${pubnubTimeToken}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.t && data.t.t) {
-          pubnubTimeToken = data.t.t;
-        }
-        if (data && Array.isArray(data.m)) {
-          data.m.forEach((msgItem) => {
-            const raw = msgItem.d || msgItem.p || msgItem;
-            let payload;
-            if (typeof raw === "object") payload = raw;
-            else try { payload = JSON.parse(raw); } catch (e) { payload = raw; }
-            if (payload) handleMessagePayload(payload);
-          });
-        }
-      }
-    } catch (e) {}
-  }, 1000);
-
-  // ntfy.sh Polling every 1s
-  const pollIntervalNtfy = setInterval(async () => {
-    if (isClosed) return;
-    try {
-      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=all`);
-      if (res.ok) {
-        const text = await res.text();
-        const lines = text.trim().split("\n");
-        lines.forEach((line) => {
-          if (!line) return;
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed && parsed.message) {
-              const msgId = parsed.id || JSON.stringify(parsed.message);
-              if (!processedMsgIds.has(msgId)) {
-                processedMsgIds.add(msgId);
-                let payload;
-                if (typeof parsed.message === "object") {
-                  payload = parsed.message;
-                } else {
-                  try { payload = JSON.parse(parsed.message); } catch (e) { payload = parsed.message; }
-                }
-                if (payload) handleMessagePayload(payload);
-              }
-            }
-          } catch (e) {}
-        });
-      }
-    } catch (e) {}
-  }, 1000);
-
-  // ntfy.sh SSE Stream
-  let sse = null;
-  try {
-    sse = new EventSource(`https://ntfy.sh/${topic}/sse?since=all`);
-    sse.onmessage = (event) => {
-      if (isClosed) return;
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed && parsed.message) {
-          const msgId = parsed.id || JSON.stringify(parsed.message);
-          if (!processedMsgIds.has(msgId)) {
-            processedMsgIds.add(msgId);
-            let payload;
-            if (typeof parsed.message === "object") {
-              payload = parsed.message;
-            } else {
-              try { payload = JSON.parse(parsed.message); } catch (e) { payload = parsed.message; }
-            }
-            if (payload) handleMessagePayload(payload);
-          }
-        }
-      } catch (e) {}
-    };
-  } catch (e) {}
+  // Universal Zero-Fail Network Transceiver Listener
+  const cleanupTransceiver = listenUniversalPayload(roomCode, uid, isHost, handleMessagePayload);
 
   notifyMessages();
 
   return () => {
-    isClosed = true;
-    cleanupP2P();
-    if (unsubFirestore) try { unsubFirestore(); } catch (e) {}
-    window.removeEventListener("storage", storageListener);
-    clearInterval(pollIntervalPubNub);
-    clearInterval(pollIntervalNtfy);
-    if (sse) sse.close();
+    cleanupTransceiver();
     if (roomChannel) {
       roomChannel.close();
       roomChannel = null;
