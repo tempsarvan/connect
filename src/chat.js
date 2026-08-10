@@ -1,6 +1,7 @@
-// Zero-Trace Client-Side AES-GCM Encrypted Chat & Triple-Transport Relay System
+// Zero-Trace Client-Side AES-GCM Encrypted Chat & Multi-Cloud PeerJS Relay System
 
 import { encryptPayload, decryptPayload } from "./cryptoEngine";
+import { initPeerJSTransport, broadcastPeerData } from "./p2pEngine";
 
 export const MAX_FILE_SIZE_BYTES = 1000 * 1024 * 1024 * 1024; // 1 Terabyte (1 TB)
 
@@ -246,12 +247,17 @@ function notifyMessages() {
   }
 }
 
-// Zero-Permission Universal Chat Relay with Quadruple Transport (ntfy.sh + RESTful API + Local Storage Event + BroadcastChannel)
+// Multi-Cloud Relay (PeerJS WebRTC P2P STUN + ntfy.sh + RESTful API KV + Local Storage)
 function publishChatMessage(roomCode, payload) {
   const topic = `connect_msg_${roomCode.trim().toLowerCase()}`;
   const bodyStr = JSON.stringify(payload);
 
-  // Transport 1: ntfy.sh POST
+  // Transport 1: PeerJS WebRTC P2P Direct Connection (Google STUN)
+  try {
+    broadcastPeerData(payload);
+  } catch (e) {}
+
+  // Transport 2: ntfy.sh POST
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
@@ -264,7 +270,7 @@ function publishChatMessage(roomCode, payload) {
     }).catch(() => {});
   } catch (e) {}
 
-  // Transport 2: RESTful API Public Object Store
+  // Transport 3: RESTful API Public Object Store
   try {
     fetch("https://api.restful-api.dev/objects", {
       method: "POST",
@@ -276,7 +282,7 @@ function publishChatMessage(roomCode, payload) {
     }).catch(() => {});
   } catch (e) {}
 
-  // Transport 3: LocalStorage Event Broadcast
+  // Transport 4: LocalStorage Event Broadcast
   try {
     localStorage.setItem(`connect_msg_event_${topic}`, JSON.stringify({ payload, timestamp: Date.now() }));
   } catch (e) {}
@@ -340,7 +346,7 @@ export async function sendMessage(roomCode, uid, payload) {
     });
   }
 
-  // Cross-device broadcast across transport layers
+  // Cross-device multi-cloud broadcast
   publishChatMessage(roomCode, {
     type: "CHAT_MESSAGE",
     roomCode,
@@ -397,7 +403,7 @@ export function deleteMessage(roomCode, messageId) {
   });
 }
 
-export function listenToMessages(roomCode, uid, onMessagesUpdated) {
+export function listenToMessages(roomCode, uid, onMessagesUpdated, isHost = false) {
   messageStore.clear();
   typingUsers.clear();
   onMessagesUpdatedCallback = onMessagesUpdated;
@@ -444,7 +450,10 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
 
   roomChannel.onmessage = (event) => handleMessagePayload(event.data);
 
-  // Universal Quadruple-Transport Chat Listener
+  // Initialize PeerJS WebRTC P2P Connection (STUN)
+  const cleanupP2P = initPeerJSTransport(roomCode, uid, isHost, handleMessagePayload);
+
+  // Universal Multi-Cloud Relay Chat Listener
   const topic = `connect_msg_${roomCode.trim().toLowerCase()}`;
   const processedMsgIds = new Set();
   let isClosed = false;
@@ -523,6 +532,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
 
   return () => {
     isClosed = true;
+    cleanupP2P();
     window.removeEventListener("storage", storageListener);
     clearInterval(pollIntervalNtfy);
     clearInterval(pollIntervalRest);

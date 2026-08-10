@@ -1229,10 +1229,11 @@ function startChatSession() {
   setTimeout(() => inputs.message.focus(), 100);
 
   if (chatUnsubscribe) chatUnsubscribe();
+  const isHost = currentRoomMembersList.length <= 1;
   chatUnsubscribe = listenToMessages(currentRoomCode, currentUid, (messages) => {
     renderMessages(messages, currentUid, displays.messagesList);
     syncHubMessages();
-  });
+  }, isHost);
 
   if (typingUnsubscribe) typingUnsubscribe();
   typingUnsubscribe = listenToTyping((typingUsers) => {
