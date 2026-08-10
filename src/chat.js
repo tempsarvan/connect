@@ -460,8 +460,9 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated) {
     
     if (type === "CHAT_MESSAGE" && message) {
       if (!messageStore.has(message.id)) {
-        if (message.encryptedText && message.encryptedText.startsWith("ENC:")) {
-          message.text = await decryptPayload(roomCode, message.encryptedText);
+        if (message.encryptedText) {
+          const decrypted = await decryptPayload(roomCode, message.encryptedText);
+          if (decrypted) message.text = decrypted;
         }
         messageStore.set(message.id, message);
         notifyMessages();
