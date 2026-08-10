@@ -481,10 +481,18 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated, isHost = fals
           if (!line) return;
           try {
             const parsed = JSON.parse(line);
-            if (parsed && parsed.id && !processedMsgIds.has(parsed.id) && parsed.message) {
-              processedMsgIds.add(parsed.id);
-              const payload = JSON.parse(parsed.message);
-              handleMessagePayload(payload);
+            if (parsed && parsed.message) {
+              const msgId = parsed.id || JSON.stringify(parsed.message);
+              if (!processedMsgIds.has(msgId)) {
+                processedMsgIds.add(msgId);
+                let payload;
+                if (typeof parsed.message === "object") {
+                  payload = parsed.message;
+                } else {
+                  try { payload = JSON.parse(parsed.message); } catch (e) { payload = parsed.message; }
+                }
+                if (payload) handleMessagePayload(payload);
+              }
             }
           } catch (e) {}
         });
@@ -500,10 +508,18 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated, isHost = fals
       if (isClosed) return;
       try {
         const parsed = JSON.parse(event.data);
-        if (parsed && parsed.id && !processedMsgIds.has(parsed.id) && parsed.message) {
-          processedMsgIds.add(parsed.id);
-          const payload = JSON.parse(parsed.message);
-          handleMessagePayload(payload);
+        if (parsed && parsed.message) {
+          const msgId = parsed.id || JSON.stringify(parsed.message);
+          if (!processedMsgIds.has(msgId)) {
+            processedMsgIds.add(msgId);
+            let payload;
+            if (typeof parsed.message === "object") {
+              payload = parsed.message;
+            } else {
+              try { payload = JSON.parse(parsed.message); } catch (e) { payload = parsed.message; }
+            }
+            if (payload) handleMessagePayload(payload);
+          }
         }
       } catch (e) {}
     };
