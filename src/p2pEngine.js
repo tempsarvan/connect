@@ -1,10 +1,22 @@
-// Multi-Cloud WebRTC P2P Direct Transport Engine using PeerJS & Google STUN Servers
+// Multi-Cloud WebRTC P2P Direct Transport Engine using PeerJS & Global STUN Servers
 // Guaranteed Instant Cross-Wi-Fi & Mobile 5G Direct Peer Data Mesh
 
 import Peer from "peerjs";
 
 const peerConnections = new Map();
 let activePeer = null;
+
+const GLOBAL_STUN_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun3.l.google.com:19302" },
+  { urls: "stun:stun4.l.google.com:19302" },
+  { urls: "stun:stun.services.mozilla.com" },
+  { urls: "stun:global.stun.twilio.com:3478" },
+  { urls: "stun:stun.voipbuster.com:3478" },
+  { urls: "stun:stun.ideasip.com" }
+];
 
 export function initPeerJSTransport(roomCode, uid, isHost, onDataReceived) {
   const cleanCode = (roomCode || "").trim().toLowerCase();
@@ -22,13 +34,7 @@ export function initPeerJSTransport(roomCode, uid, isHost, onDataReceived) {
 
     activePeer = new Peer(peerId, {
       config: {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-          { urls: "stun:stun2.l.google.com:19302" },
-          { urls: "stun:stun3.l.google.com:19302" },
-          { urls: "stun:stun4.l.google.com:19302" }
-        ]
+        iceServers: GLOBAL_STUN_SERVERS
       }
     });
 
@@ -59,7 +65,6 @@ export function initPeerJSTransport(roomCode, uid, isHost, onDataReceived) {
 
     activePeer.on("error", (err) => {
       if (err && err.type === "unavailable-id") {
-        // ID taken by Host, connect as peer client
         connectToPeerHost(hostId, onDataReceived);
       } else {
         setTimeout(() => {

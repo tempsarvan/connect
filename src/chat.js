@@ -1,7 +1,9 @@
-// Zero-Trace Client-Side AES-GCM Encrypted Chat & Multi-Cloud PeerJS Relay System
+// Zero-Trace Client-Side AES-GCM Encrypted Chat & Hyper-Redundant Multi-Cloud Relay Engine
 
 import { encryptPayload, decryptPayload } from "./cryptoEngine";
 import { initPeerJSTransport, broadcastPeerData } from "./p2pEngine";
+import { db } from "./firebase";
+import { collection, onSnapshot, doc, setDoc } from "firebase/firestore";
 
 export const MAX_FILE_SIZE_BYTES = 1000 * 1024 * 1024 * 1024; // 1 Terabyte (1 TB)
 
@@ -29,6 +31,9 @@ let globalEventsChannel = null;
 let typingListeners = new Set();
 
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 Hours
+
+const PUBNUB_PUB_KEY = "pub-c-46efd0d9-768a-40a2-9442-990977d4c062";
+const PUBNUB_SUB_KEY = "sub-c-5290b200-a10c-11e1-b851-9319b9909240";
 
 function generateFriendKey() {
   const code = "CN-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Math.floor(10 + Math.random() * 90);
@@ -247,42 +252,47 @@ function notifyMessages() {
   }
 }
 
-// Multi-Cloud Relay (PeerJS WebRTC P2P STUN + ntfy.sh + RESTful API KV + Local Storage)
+// Hyper-Redundant Multi-Cloud Relay Engine (PeerJS STUN + PubNub + Firebase Firestore + ntfy.sh + RESTful API + Local Storage)
 function publishChatMessage(roomCode, payload) {
   const topic = `connect_msg_${roomCode.trim().toLowerCase()}`;
   const bodyStr = JSON.stringify(payload);
 
-  // Transport 1: PeerJS WebRTC P2P Direct Connection (Google STUN)
+  // Transport 1: PeerJS WebRTC P2P Direct Mesh (Google STUN)
   try {
     broadcastPeerData(payload);
   } catch (e) {}
 
-  // Transport 2: ntfy.sh POST
+  // Transport 2: PubNub Global Network
+  try {
+    fetch(`https://ps.pubnub.com/publish/${PUBNUB_PUB_KEY}/${PUBNUB_SUB_KEY}/0/${topic}/0/${encodeURIComponent(bodyStr)}`).catch(() => {});
+  } catch (e) {}
+
+  // Transport 3: Firebase Cloud Firestore
+  try {
+    const msgId = payload.message?.id || "msg_" + Date.now().toString(36);
+    const msgRef = doc(db, "connect_rooms", topic, "messages", msgId);
+    setDoc(msgRef, { payload: bodyStr, timestamp: Date.now() }).catch(() => {});
+  } catch (e) {}
+
+  // Transport 4: ntfy.sh POST
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
-      headers: {
-        "Title": "Connect Message",
-        "Cache": "yes",
-        "X-Cache": "yes"
-      },
+      headers: { "Title": "Connect Message", "Cache": "yes", "X-Cache": "yes" },
       body: bodyStr
     }).catch(() => {});
   } catch (e) {}
 
-  // Transport 3: RESTful API Public Object Store
+  // Transport 5: RESTful API Public Object Store
   try {
     fetch("https://api.restful-api.dev/objects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: topic,
-        data: payload
-      })
+      body: JSON.stringify({ name: topic, data: payload })
     }).catch(() => {});
   } catch (e) {}
 
-  // Transport 4: LocalStorage Event Broadcast
+  // Transport 6: LocalStorage Event Broadcast
   try {
     localStorage.setItem(`connect_msg_event_${topic}`, JSON.stringify({ payload, timestamp: Date.now() }));
   } catch (e) {}
@@ -469,7 +479,51 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated, isHost = fals
   };
   window.addEventListener("storage", storageListener);
 
-  // 1. ntfy.sh Polling every 1s (since=all)
+  // Firestore Realtime Listener
+  let unsubFirestore = null;
+  try {
+    const colRef = collection(db, "connect_rooms", topic, "messages");
+    unsubFirestore = onSnapshot(colRef, (snapshot) => {
+      if (isClosed) return;
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          if (data && data.payload) {
+            try {
+              const payload = typeof data.payload === "string" ? JSON.parse(data.payload) : data.payload;
+              handleMessagePayload(payload);
+            } catch (e) {}
+          }
+        }
+      });
+    }, () => {});
+  } catch (e) {}
+
+  // PubNub Global Polling (1s interval)
+  let pubnubTimeToken = "0";
+  const pollIntervalPubNub = setInterval(async () => {
+    if (isClosed) return;
+    try {
+      const res = await fetch(`https://ps.pubnub.com/v2/subscribe/${PUBNUB_SUB_KEY}/${topic}/0?tt=${pubnubTimeToken}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.t && data.t.t) {
+          pubnubTimeToken = data.t.t;
+        }
+        if (data && Array.isArray(data.m)) {
+          data.m.forEach((msgItem) => {
+            const raw = msgItem.d || msgItem.p || msgItem;
+            let payload;
+            if (typeof raw === "object") payload = raw;
+            else try { payload = JSON.parse(raw); } catch (e) { payload = raw; }
+            if (payload) handleMessagePayload(payload);
+          });
+        }
+      }
+    } catch (e) {}
+  }, 1000);
+
+  // ntfy.sh Polling every 1s
   const pollIntervalNtfy = setInterval(async () => {
     if (isClosed) return;
     try {
@@ -500,7 +554,7 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated, isHost = fals
     } catch (e) {}
   }, 1000);
 
-  // 2. ntfy.sh SSE Stream (/sse?since=all)
+  // ntfy.sh SSE Stream
   let sse = null;
   try {
     sse = new EventSource(`https://ntfy.sh/${topic}/sse?since=all`);
@@ -525,33 +579,15 @@ export function listenToMessages(roomCode, uid, onMessagesUpdated, isHost = fals
     };
   } catch (e) {}
 
-  // 3. RESTful API KV Polling Backup every 1.5s
-  const pollIntervalRest = setInterval(async () => {
-    if (isClosed) return;
-    try {
-      const res = await fetch("https://api.restful-api.dev/objects");
-      if (res.ok) {
-        const items = await res.json();
-        if (Array.isArray(items)) {
-          items.forEach((item) => {
-            if (item.name === topic && item.data && !processedMsgIds.has(item.id)) {
-              processedMsgIds.add(item.id);
-              handleMessagePayload(item.data);
-            }
-          });
-        }
-      }
-    } catch (e) {}
-  }, 1500);
-
   notifyMessages();
 
   return () => {
     isClosed = true;
     cleanupP2P();
+    if (unsubFirestore) try { unsubFirestore(); } catch (e) {}
     window.removeEventListener("storage", storageListener);
+    clearInterval(pollIntervalPubNub);
     clearInterval(pollIntervalNtfy);
-    clearInterval(pollIntervalRest);
     if (sse) sse.close();
     if (roomChannel) {
       roomChannel.close();
