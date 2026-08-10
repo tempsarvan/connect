@@ -34,12 +34,8 @@ import {
   unregisterUnloadCleanup 
 } from "./cleanup";
 import { processImageFile } from "./media";
-import { generateQRCodeSVG } from "./qrcode";
 import { startVoiceRecording, stopVoiceRecording } from "./audio";
 import { exportVaultBackup, panicWipeAllData } from "./vault";
-import { runJavaScriptSnippet } from "./devSuite";
-import { initDesignCanvas, generateColorPalette } from "./designSuite";
-import { triggerVariantTransition } from "./variantTransitions";
 import { 
   views, 
   buttons, 
@@ -58,8 +54,7 @@ import {
   closeLightbox
 } from "./ui";
 import { initThreeShowcase } from "./showcase3d";
-
-import { MatrixScrambler } from "./matrixScrambler";
+import { soundEngine } from "./sound";
 
 let currentRoomCode = null;
 let isCurrentRoomPublic = false;
@@ -71,15 +66,10 @@ let roomUnsubscribe = null;
 let chatUnsubscribe = null;
 let currentAuthMode = "signup";
 let selectedBannerColor = getProfileBannerColor();
-let selectedDeviceMode = "computer";
 let isRecordingVoice = false;
-let currentEdition = "standard";
-let designCanvasControls = null;
-let matrixScramblerInstance = null;
 
 async function init() {
   setupEventListeners();
-  setupEditionSwitcher();
 
   try {
     currentUid = await initAuth();
@@ -91,20 +81,9 @@ async function init() {
     initThreeShowcase(displays.threeBgCanvas);
   }
 
-  // Initialize Matrix Text Scrambler Engine on Footer Button
-  const scrambleTarget = document.getElementById("matrix-scramble-output");
-  if (scrambleTarget) {
-    matrixScramblerInstance = new MatrixScrambler(scrambleTarget, "Enter Connect's World");
-  }
-
   // Auto-join via QR Code Scan Query URL Parameter e.g. ?join=X7K9P2
   const urlParams = new URLSearchParams(window.location.search);
   const qrJoinCode = urlParams.get("join") || urlParams.get("code");
-  const editionParam = urlParams.get("edition");
-
-  if (editionParam) {
-    switchEdition(editionParam);
-  }
 
   if (qrJoinCode && qrJoinCode.length === 6) {
     inputs.code.value = qrJoinCode.toUpperCase();
@@ -114,7 +93,8 @@ async function init() {
       showToast(`Scanned QR Code! Auto-entering room [${qrJoinCode.toUpperCase()}]...`);
     }, 400);
   } else {
-    showView("showcase");
+    // Default directly to Connect Messenger Dashboard (Landing)
+    showView("landing");
   }
 
   if (hasValidSession()) {
@@ -123,84 +103,14 @@ async function init() {
 
   // Initialize Global Room Invitation Listener
   initGlobalEvents(({ sender, roomCode, roomName, isPublic }) => {
+    soundEngine.playSoundFX("bell");
     showToast(`🔔 ${sender} invited you to ${isPublic ? 'Public' : 'Private'} Room [${roomCode}]!`, 6000);
     inputs.code.value = roomCode;
   });
 
+  updateProfileUI();
   updateFriendsUI();
   updateSavedRoomsUI();
-}
-
-function switchEdition(edition) {
-  if (edition === currentEdition) return;
-
-  const oldEdition = currentEdition;
-  triggerVariantTransition(oldEdition, edition, () => {
-    currentEdition = edition;
-    document.body.dataset.edition = edition;
-
-    document.querySelectorAll(".edition-tab").forEach((tab) => {
-      if (tab.dataset.edition === edition) tab.classList.add("active");
-      else tab.classList.remove("active");
-    });
-
-    document.querySelectorAll(".variant-animated-tab").forEach((tab) => {
-      if (tab.dataset.variant === edition) tab.classList.add("active");
-      else tab.classList.remove("active");
-    });
-
-    document.querySelectorAll(".edition-card").forEach((card) => {
-      if (card.dataset.editionSelect === edition) card.classList.add("active");
-      else card.classList.remove("active");
-    });
-
-    const heroBadge = document.getElementById("hero-badge-edition-text");
-    const heroHeadline = document.getElementById("hero-headline-edition");
-    const heroSubtitle = document.getElementById("hero-subtitle-edition");
-    const landingTagline = document.getElementById("landing-tagline-edition");
-
-    if (edition === "dev") {
-      if (heroBadge) heroBadge.textContent = "CONNECT FOR CODERS • MONOKAI IDE SUITE";
-      if (heroHeadline) heroHeadline.innerHTML = "Code together.<br>Ship zero-trace.";
-      if (heroSubtitle) heroSubtitle.textContent = "Built for developers & coders. Experience live JS evaluator console, syntax highlighting, Git snippet sharing, and 1 TB archives.";
-      if (landingTagline) landingTagline.textContent = "programmer IDE chat & live code execution suite";
-      showToast("Switched to Connect for Coders edition 💻");
-    } else if (edition === "design") {
-      if (heroBadge) heroBadge.textContent = "CONNECT FOR DESIGNERS • CANVAS SUITE";
-      if (heroHeadline) heroHeadline.innerHTML = "Design together.<br>Canvas whiteboards.";
-      if (heroSubtitle) heroSubtitle.textContent = "Built for designers & creators. Experience collaborative whiteboard canvas, color palette generators, and HSL moodboards.";
-      if (landingTagline) landingTagline.textContent = "designer whiteboard canvas & moodboard suite";
-      showToast("Switched to Connect for Designers edition 🎨");
-    } else {
-      if (heroBadge) heroBadge.textContent = "ZERO-TRACE EPHEMERAL & PERSISTENT SUITE";
-      if (heroHeadline) heroHeadline.innerHTML = "Talk freely.<br>Leave no trace.";
-      if (heroSubtitle) heroSubtitle.textContent = "Connect is a hybrid communications suite engineered for phone, tablet, and desktop. Experience 6-digit private & public room codes, instant device QR pairing, unique handle protection, and 1 TB file support.";
-      if (landingTagline) landingTagline.textContent = "ephemeral private & persistent public rooms";
-      showToast("Switched to Just Connect Standard edition ⚡");
-    }
-  });
-}
-
-function setupEditionSwitcher() {
-  document.querySelectorAll(".edition-tab").forEach((btn) => {
-    btn.addEventListener("click", () => switchEdition(btn.dataset.edition));
-  });
-
-  document.querySelectorAll(".variant-animated-tab").forEach((btn) => {
-    btn.addEventListener("click", () => switchEdition(btn.dataset.variant));
-  });
-
-  document.querySelectorAll(".btn-select-edition").forEach((btn) => {
-    btn.addEventListener("click", () => switchEdition(btn.dataset.editionSelect));
-  });
-
-  document.getElementById("link-edition-std")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("standard"); });
-  document.getElementById("link-edition-dev")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("dev"); });
-  document.getElementById("link-edition-design")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("design"); });
-
-  document.getElementById("link-variant-std")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("standard"); });
-  document.getElementById("link-variant-dev")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("dev"); });
-  document.getElementById("link-variant-design")?.addEventListener("click", (e) => { e.preventDefault(); switchEdition("design"); });
 }
 
 function enterConnectApp() {
@@ -252,8 +162,8 @@ function updateAuthModalUI() {
 function handleAuthSubmit() {
   const uname = inputs.authUsername.value.trim();
   const pwd = inputs.authPassword.value.trim();
-  const soundOn = inputs.authSoundToggle.checked;
-  const vaultOn = inputs.authVaultToggle.checked;
+  const soundOn = inputs.authSoundToggle ? inputs.authSoundToggle.checked : true;
+  const vaultOn = inputs.authVaultToggle ? inputs.authVaultToggle.checked : true;
 
   if (!uname) {
     showToast("Please enter a username or handle");
@@ -269,7 +179,8 @@ function handleAuthSubmit() {
     updateProfileUI();
     closeAuthModal();
 
-    showToast(`Authenticated as ${getUsername()}. Welcome!`);
+    soundEngine.playSoundFX("bell");
+    showToast(`Authenticated as ${getUsername()}. Welcome to Connect!`);
     updateSavedRoomsUI();
     showView("landing");
   } catch (err) {
@@ -281,12 +192,12 @@ function updateProfileUI() {
   const uname = getUsername();
   const pwd = getPassword();
 
-  inputs.settingUsername.value = uname;
-  inputs.settingPassword.value = pwd;
-  inputs.settingFriendKey.value = getFriendKey();
+  if (inputs.settingUsername) inputs.settingUsername.value = uname;
+  if (inputs.settingPassword) inputs.settingPassword.value = pwd;
+  if (inputs.settingFriendKey) inputs.settingFriendKey.value = getFriendKey();
 
-  displays.landingUsernameLabel.textContent = uname;
-  displays.chatHeaderUsername.textContent = uname;
+  if (displays.landingUsernameLabel) displays.landingUsernameLabel.textContent = uname;
+  if (displays.chatHeaderUsername) displays.chatHeaderUsername.textContent = uname;
 }
 
 function updateSavedRoomsUI() {
@@ -295,29 +206,6 @@ function updateSavedRoomsUI() {
     inputs.code.value = code;
     handleJoinRoom();
   });
-}
-
-function updateDevicePairingUI() {
-  buttons.deviceComputer.classList.remove("active");
-  buttons.deviceTablet.classList.remove("active");
-  buttons.devicePhone.classList.remove("active");
-
-  if (selectedDeviceMode === "computer") {
-    buttons.deviceComputer.classList.add("active");
-    displays.qrCodeDisplayWrapper.classList.add("hidden");
-  } else if (selectedDeviceMode === "tablet" || selectedDeviceMode === "phone") {
-    if (selectedDeviceMode === "tablet") buttons.deviceTablet.classList.add("active");
-    if (selectedDeviceMode === "phone") buttons.devicePhone.classList.add("active");
-
-    displays.qrCodeVectorContainer.innerHTML = `
-      <div class="wip-notice-card" style="padding:24px 16px; text-align:center; background:rgba(18,18,24,0.85); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.15); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.5); max-width:280px; margin:0 auto;">
-        <div style="font-size:2rem; margin-bottom:8px;">🚧</div>
-        <h4 style="color:#ffffff; font-size:0.95rem; font-weight:700; letter-spacing:-0.01em;">Work In Progress</h4>
-        <p style="color:var(--text-muted); font-size:0.78rem; margin-top:6px; line-height:1.5;">${selectedDeviceMode === "phone" ? "Phone" : "Tablet"} device pairing is under active development. Please enter the 6-digit room code directly on your device!</p>
-      </div>
-    `;
-    displays.qrCodeDisplayWrapper.classList.remove("hidden");
-  }
 }
 
 function openEditProfileStudio() {
@@ -400,94 +288,6 @@ function updateFriendsUI() {
 }
 
 function setupEventListeners() {
-  // Enter Connect's World Matrix Scrambler Button Handler
-  document.getElementById("scramble-text-btn")?.addEventListener("click", () => {
-    document.getElementById("modal-connect-world-panel")?.classList.remove("hidden");
-  });
-
-  document.getElementById("btn-close-world-panel")?.addEventListener("click", () => {
-    document.getElementById("modal-connect-world-panel")?.classList.add("hidden");
-  });
-
-  document.querySelectorAll(".world-variant-option").forEach((card) => {
-    card.addEventListener("click", () => {
-      const variant = card.dataset.launchVariant;
-      switchEdition(variant);
-      document.getElementById("modal-connect-world-panel")?.classList.add("hidden");
-      enterConnectApp();
-    });
-  });
-
-  // Dev & Design Tools Modal Triggers
-  document.getElementById("btn-open-dev-tools")?.addEventListener("click", () => {
-    document.getElementById("modal-dev-editor")?.classList.remove("hidden");
-  });
-  document.getElementById("btn-close-dev-editor")?.addEventListener("click", () => {
-    document.getElementById("modal-dev-editor")?.classList.add("hidden");
-  });
-
-  document.getElementById("btn-run-dev-code")?.addEventListener("click", () => {
-    const code = document.getElementById("dev-code-input").value;
-    const res = runJavaScriptSnippet(code);
-    const out = document.getElementById("dev-console-output");
-    if (res.success) {
-      out.textContent = `> Output: ${res.logs.join("\n") || res.result || "Executed cleanly"}`;
-      out.style.color = "#7ee787";
-    } else {
-      out.textContent = `> Error: ${res.error}`;
-      out.style.color = "#f85149";
-    }
-  });
-
-  document.getElementById("btn-share-dev-code")?.addEventListener("click", async () => {
-    const code = document.getElementById("dev-code-input").value.trim();
-    if (code && currentRoomCode) {
-      await sendMessage(currentRoomCode, currentUid, {
-        text: `\`\`\`js\n${code}\n\`\`\``,
-        mediaType: "text"
-      });
-      document.getElementById("modal-dev-editor")?.classList.add("hidden");
-      showToast("Shared Code Snippet in chat!");
-    }
-  });
-
-  document.getElementById("btn-open-design-tools")?.addEventListener("click", () => {
-    const modal = document.getElementById("modal-design-canvas");
-    modal?.classList.remove("hidden");
-    const canvas = document.getElementById("design-whiteboard-canvas");
-    if (canvas && !designCanvasControls) {
-      designCanvasControls = initDesignCanvas(canvas);
-    }
-  });
-  document.getElementById("btn-close-design-canvas")?.addEventListener("click", () => {
-    document.getElementById("modal-design-canvas")?.classList.add("hidden");
-  });
-
-  document.getElementById("btn-clear-canvas")?.addEventListener("click", () => {
-    if (designCanvasControls) designCanvasControls.clear();
-  });
-
-  document.getElementById("btn-share-canvas")?.addEventListener("click", async () => {
-    if (designCanvasControls && currentRoomCode) {
-      const dataUrl = designCanvasControls.exportPNG();
-      await sendMessage(currentRoomCode, currentUid, {
-        text: "🎨 Canvas Whiteboard Sketch",
-        mediaType: "image",
-        mediaUrl: dataUrl
-      });
-      document.getElementById("modal-design-canvas")?.classList.add("hidden");
-      showToast("Shared Canvas Sketch in chat!");
-    }
-  });
-
-  document.querySelectorAll("[data-canvas-color]").forEach((swatch) => {
-    swatch.addEventListener("click", () => {
-      const color = swatch.dataset.canvasColor;
-      if (designCanvasControls) designCanvasControls.setColor(color);
-      showToast(`Selected canvas color: ${color}`);
-    });
-  });
-
   // Voice Recording Toggle
   buttons.recordVoiceNote?.addEventListener("click", async () => {
     displays.dropdownToolsMenu.classList.add("hidden");
@@ -505,6 +305,7 @@ function setupEventListeners() {
           mediaType: "audio",
           mediaUrl: audioUrl
         });
+        soundEngine.playMessageDing();
         showToast("Voice Note sent!");
       }
     }
@@ -532,20 +333,6 @@ function setupEventListeners() {
     showToast("Vault Backup downloaded!");
   });
 
-  // Device QR Code Pairing Tabs
-  buttons.deviceComputer?.addEventListener("click", () => {
-    selectedDeviceMode = "computer";
-    updateDevicePairingUI();
-  });
-  buttons.deviceTablet?.addEventListener("click", () => {
-    selectedDeviceMode = "tablet";
-    updateDevicePairingUI();
-  });
-  buttons.devicePhone?.addEventListener("click", () => {
-    selectedDeviceMode = "phone";
-    updateDevicePairingUI();
-  });
-
   // Upward Expanding Tools Menu Toggle
   buttons.toolsMenuToggle?.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -553,82 +340,66 @@ function setupEventListeners() {
   });
 
   document.addEventListener("click", (e) => {
-    if (!displays.dropdownToolsMenu.contains(e.target) && e.target !== buttons.toolsMenuToggle) {
+    if (displays.dropdownToolsMenu && !displays.dropdownToolsMenu.contains(e.target) && e.target !== buttons.toolsMenuToggle) {
       displays.dropdownToolsMenu.classList.add("hidden");
     }
   });
 
-  // Navigation & Landing Page Auth
-  buttons.navLogin.addEventListener("click", () => {
+  // Showcase Navigation & Tour
+  buttons.navLogin?.addEventListener("click", () => {
     if (hasValidSession()) enterConnectApp();
     else openAuthModal("login");
   });
 
-  buttons.navSignup.addEventListener("click", () => {
+  buttons.navSignup?.addEventListener("click", () => {
     if (hasValidSession()) enterConnectApp();
     else openAuthModal("signup");
   });
 
-  buttons.heroLogin.addEventListener("click", () => {
+  buttons.heroLogin?.addEventListener("click", () => {
     if (hasValidSession()) enterConnectApp();
     else openAuthModal("login");
   });
 
-  buttons.heroSignup.addEventListener("click", () => {
+  buttons.heroSignup?.addEventListener("click", () => {
     if (hasValidSession()) enterConnectApp();
     else openAuthModal("signup");
   });
 
-  buttons.finalLogin.addEventListener("click", () => {
-    if (hasValidSession()) enterConnectApp();
-    else openAuthModal("login");
+  buttons.navTour?.addEventListener("click", () => {
+    showView("showcase");
+    setTimeout(() => {
+      document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   });
 
-  buttons.enterConnectFinal.addEventListener("click", () => {
-    if (hasValidSession()) enterConnectApp();
-    else openAuthModal("signup");
-  });
-
-  buttons.navTour.addEventListener("click", () => {
+  buttons.startTourScroll?.addEventListener("click", () => {
     document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
   });
 
-  buttons.startTourScroll.addEventListener("click", () => {
-    document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
-  });
-
-  buttons.navFeatures.addEventListener("click", () => {
-    document.getElementById("section-changelog")?.scrollIntoView({ behavior: "smooth" });
-  });
-
-  // Footer link handlers
-  document.getElementById("link-footer-login")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (hasValidSession()) enterConnectApp();
-    else openAuthModal("login");
-  });
-  document.getElementById("link-footer-signup")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (hasValidSession()) enterConnectApp();
-    else openAuthModal("signup");
+  buttons.navFeatures?.addEventListener("click", () => {
+    showView("showcase");
+    setTimeout(() => {
+      document.getElementById("section-tour-details")?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   });
 
   // Auth Modal Handlers
-  buttons.closeAuthModal.addEventListener("click", closeAuthModal);
-  buttons.authTabSignup.addEventListener("click", () => {
+  buttons.closeAuthModal?.addEventListener("click", closeAuthModal);
+  buttons.authTabSignup?.addEventListener("click", () => {
     currentAuthMode = "signup";
     updateAuthModalUI();
   });
-  buttons.authTabLogin.addEventListener("click", () => {
+  buttons.authTabLogin?.addEventListener("click", () => {
     currentAuthMode = "login";
     updateAuthModalUI();
   });
-  buttons.submitAuth.addEventListener("click", handleAuthSubmit);
+  buttons.submitAuth?.addEventListener("click", handleAuthSubmit);
 
   // Profile Customization Studio Handlers
-  buttons.closeProfileCard.addEventListener("click", () => displays.modalProfileCard.classList.add("hidden"));
-  buttons.closeEditProfile.addEventListener("click", closeEditProfileStudio);
-  buttons.saveProfileCustomization.addEventListener("click", handleSaveProfileCustomization);
+  buttons.closeProfileCard?.addEventListener("click", () => displays.modalProfileCard.classList.add("hidden"));
+  buttons.closeEditProfile?.addEventListener("click", closeEditProfileStudio);
+  buttons.saveProfileCustomization?.addEventListener("click", handleSaveProfileCustomization);
 
   document.querySelectorAll(".banner-swatch").forEach((swatch) => {
     swatch.addEventListener("click", () => {
@@ -639,26 +410,25 @@ function setupEventListeners() {
   });
 
   // Create Public Code Handlers
-  buttons.createPublicCode.addEventListener("click", openCreatePublicModal);
-  buttons.closeCreatePublic.addEventListener("click", () => displays.modalCreatePublicRoom.classList.add("hidden"));
-  buttons.submitCreatePublic.addEventListener("click", handleCreatePublicCodeSubmit);
+  buttons.createPublicCode?.addEventListener("click", openCreatePublicModal);
+  buttons.closeCreatePublic?.addEventListener("click", () => displays.modalCreatePublicRoom.classList.add("hidden"));
+  buttons.submitCreatePublic?.addEventListener("click", handleCreatePublicCodeSubmit);
 
   // Room Invitations Handlers
-  buttons.inviteFriendsWaiting.addEventListener("click", openInviteFriendsModal);
-  buttons.inviteFriendsChat.addEventListener("click", openInviteFriendsModal);
-  buttons.closeInviteFriends.addEventListener("click", () => displays.modalInviteFriends.classList.add("hidden"));
+  buttons.inviteFriendsChat?.addEventListener("click", openInviteFriendsModal);
+  buttons.closeInviteFriends?.addEventListener("click", () => displays.modalInviteFriends.classList.add("hidden"));
 
   // Friends List Drawer Handlers
-  buttons.friendsDrawer.addEventListener("click", () => {
+  buttons.friendsDrawer?.addEventListener("click", () => {
     updateFriendsUI();
     displays.modalFriendsList.classList.remove("hidden");
   });
 
-  buttons.closeFriendsModal.addEventListener("click", () => {
+  buttons.closeFriendsModal?.addEventListener("click", () => {
     displays.modalFriendsList.classList.add("hidden");
   });
 
-  buttons.addFriendSubmit.addEventListener("click", () => {
+  buttons.addFriendSubmit?.addEventListener("click", () => {
     const handleOrKey = inputs.addFriendHandle.value.trim();
     if (!handleOrKey) {
       showToast("Please enter a handle or Friend Key e.g. CN-9X4A-82");
@@ -675,41 +445,40 @@ function setupEventListeners() {
   });
 
   // Private & Public Room Creation & Joining
-  buttons.createPrivateCode.addEventListener("click", () => handleCreateRoom(false));
-  buttons.join.addEventListener("click", handleJoinRoom);
+  buttons.createPrivateCode?.addEventListener("click", () => handleCreateRoom(false));
+  buttons.join?.addEventListener("click", handleJoinRoom);
 
-  inputs.code.addEventListener("keydown", (e) => {
+  inputs.code?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") handleJoinRoom();
   });
 
-  inputs.code.addEventListener("input", () => {
+  inputs.code?.addEventListener("input", () => {
     inputs.code.value = inputs.code.value.toUpperCase().trim();
   });
 
-  buttons.copyCode.addEventListener("click", () => {
+  buttons.copyCode?.addEventListener("click", () => {
     if (currentRoomCode) {
       navigator.clipboard.writeText(currentRoomCode);
-      showToast("Code copied to clipboard");
+      showToast(`Room code [${currentRoomCode}] copied to clipboard!`);
     }
   });
 
-  buttons.cancelRoom.addEventListener("click", handleCancelRoom);
-  buttons.endSession.addEventListener("click", handleEndSession);
-  buttons.returnHome.addEventListener("click", handleReturnHome);
+  buttons.endSession?.addEventListener("click", handleEndSession);
+  buttons.returnHome?.addEventListener("click", handleReturnHome);
 
   // Profile Cards on Header Pills
-  buttons.profileLanding.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
-  buttons.profileHeader.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
+  buttons.profileLanding?.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
+  buttons.profileHeader?.addEventListener("click", () => openProfileCardModal(getUsername(), true, openEditProfileStudio));
 
   // Settings Gear
-  buttons.gearLanding.addEventListener("click", openFullscreenSettings);
-  buttons.gearChat.addEventListener("click", openFullscreenSettings);
-  buttons.closeFullscreenSettings.addEventListener("click", closeFullscreenSettings);
-  buttons.saveFullscreenSettings.addEventListener("click", handleSaveSettings);
+  buttons.gearLanding?.addEventListener("click", openFullscreenSettings);
+  buttons.gearChat?.addEventListener("click", openFullscreenSettings);
+  buttons.closeFullscreenSettings?.addEventListener("click", closeFullscreenSettings);
+  buttons.saveFullscreenSettings?.addEventListener("click", handleSaveSettings);
 
   // Chat Send
-  buttons.send.addEventListener("click", handleSendMessage);
-  inputs.message.addEventListener("keydown", (e) => {
+  buttons.send?.addEventListener("click", handleSendMessage);
+  inputs.message?.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -717,16 +486,16 @@ function setupEventListeners() {
   });
 
   // File Upload Handlers
-  inputs.fileUpload.addEventListener("change", (e) => {
+  inputs.fileUpload?.addEventListener("change", (e) => {
     displays.dropdownToolsMenu.classList.add("hidden");
     handleFileUpload(e, currentRoomCode);
   });
-  inputs.photoUpload.addEventListener("change", (e) => {
+  inputs.photoUpload?.addEventListener("change", (e) => {
     displays.dropdownToolsMenu.classList.add("hidden");
     handlePhotoUpload(e, currentRoomCode);
   });
 
-  buttons.closeLightbox.addEventListener("click", closeLightbox);
+  buttons.closeLightbox?.addEventListener("click", closeLightbox);
 }
 
 function openFullscreenSettings() {
@@ -768,6 +537,7 @@ async function handleSendMessage() {
     mediaType: "text"
   });
 
+  soundEngine.playMessageDing();
   inputs.message.focus();
 }
 
@@ -786,6 +556,7 @@ async function handlePhotoUpload(e, targetRoomId) {
     });
 
     e.target.value = "";
+    soundEngine.playMessageDing();
   } catch (err) {
     showToast("Could not send image: " + err.message);
   }
@@ -819,6 +590,7 @@ async function handleFileUpload(e, targetRoomId) {
       });
 
       e.target.value = "";
+      soundEngine.playMessageDing();
       showToast(`Attachment sent (${formattedSize})`);
     };
     reader.readAsDataURL(file);
@@ -838,6 +610,7 @@ async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = n
       name: roomName || `Public Room ${roomCode}`,
       topic: roomTopic || "Persistent community space"
     };
+    savePublicRoomToHub(roomCode, currentPublicRoomInfo.name, currentPublicRoomInfo.topic);
   } else {
     currentPublicRoomInfo = null;
   }
@@ -850,29 +623,10 @@ async function handleCreateRoom(isPublic = false, roomName = null, roomTopic = n
       registerUnloadCleanup(currentRoomCode);
     }
 
-    displays.roomCode.textContent = roomCode;
-    displays.roomTypeBadgeWaiting.textContent = isPublic ? "🌐 Persistent Public Room Code" : "🔒 Ephemeral Private Room Code";
-    
-    selectedDeviceMode = "computer";
-    updateDevicePairingUI();
-
-    showView("waiting");
-
-    if (roomUnsubscribe) roomUnsubscribe();
-    roomUnsubscribe = listenToRoom(roomCode, (roomData) => {
-      if (roomData && roomData.members) {
-        currentRoomMembersList = roomData.members;
-      }
-      if (!roomData || roomData.status === "ended") {
-        if (views.chat.classList.contains("active") || views.waiting.classList.contains("active")) {
-          onSessionEnded();
-        }
-      } else if (roomData.status === "active" && roomData.members.length >= 2) {
-        if (!views.chat.classList.contains("active")) {
-          startChatSession();
-        }
-      }
-    });
+    // Instantly launch chat room session so messenger is immediately active!
+    soundEngine.playSoundFX("bell");
+    startChatSession();
+    showToast(`Created ${isPublic ? 'Public' : 'Private'} Room [${roomCode}]! Share code to chat.`);
   } catch (err) {
     showToast(err.message || "Failed to create room.");
   }
@@ -903,7 +657,9 @@ async function handleJoinRoom() {
       registerUnloadCleanup(currentRoomCode);
     }
 
+    soundEngine.playSoundFX("bell");
     startChatSession();
+    showToast(`Entered Room [${code}]!`);
   } catch (err) {
     showToast(err.message || "Could not join room.");
   } finally {
@@ -913,7 +669,7 @@ async function handleJoinRoom() {
 
 function startChatSession() {
   displays.chatRoomCode.textContent = currentRoomCode;
-  displays.chatHeaderRoomType.textContent = isCurrentRoomPublic ? "🌐 public room" : "🔒 private room";
+  displays.chatHeaderRoomType.textContent = isCurrentRoomPublic ? `🌐 ${currentPublicRoomInfo?.name || 'Public Room'}` : "🔒 Ephemeral Room";
   showView("chat");
   setTimeout(() => inputs.message.focus(), 100);
 
@@ -933,17 +689,10 @@ function startChatSession() {
   });
 }
 
-async function handleCancelRoom() {
-  if (currentRoomCode && !isCurrentRoomPublic) {
-    await destroyRoomSession(currentRoomCode);
-  }
-  resetAppState();
-}
-
 async function handleEndSession() {
   if (isCurrentRoomPublic && currentRoomCode) {
     savePublicRoomToHub(currentRoomCode, currentPublicRoomInfo?.name, currentPublicRoomInfo?.topic);
-    showToast(`Saved ${currentRoomCode} to your Rooms hub.`);
+    showToast(`Saved [${currentRoomCode}] to your Public Rooms Hub.`);
   } else if (currentRoomCode) {
     await destroyRoomSession(currentRoomCode);
   }
@@ -963,7 +712,7 @@ function onSessionEnded() {
   }
 
   if (isCurrentRoomPublic) {
-    displays.overlaySubtitleDesc.textContent = "public room saved to your Rooms section";
+    displays.overlaySubtitleDesc.textContent = "public room saved to your Rooms Hub";
   } else {
     displays.overlaySubtitleDesc.textContent = "all private room messages destroyed";
   }
