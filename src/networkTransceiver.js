@@ -1,5 +1,5 @@
 // Universal Zero-Fail Network Transceiver Engine for Connect
-// Integrates 5 independent global cloud backends for multi-network cross-Wi-Fi messaging
+// PeerJS WebRTC P2P (9 STUN Servers) + ntfy.sh SSE Push Stream + LocalStorage & BroadcastChannel
 
 import { initPeerJSTransport, broadcastPeerData } from "./p2pEngine";
 
@@ -24,21 +24,12 @@ export function broadcastUniversalPayload(roomCode, payload) {
 
   processedPayloadHashes.add(payloadHash);
 
-  // 1. PeerJS WebRTC Direct Mesh (9 STUN Servers)
+  // 1. PeerJS WebRTC Direct Data Channel Mesh (Google & Mozilla STUN)
   try {
     broadcastPeerData(payload);
   } catch (e) {}
 
-  // 2. Firebase RTDB REST POST (Public zero-auth global DB)
-  try {
-    fetch(`https://connect-private-default-rtdb.firebaseio.com/rooms/${topic}.json`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: payloadStr
-    }).catch(() => {});
-  } catch (e) {}
-
-  // 3. ntfy.sh POST
+  // 2. ntfy.sh Global Stream POST
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
@@ -47,16 +38,7 @@ export function broadcastUniversalPayload(roomCode, payload) {
     }).catch(() => {});
   } catch (e) {}
 
-  // 4. RESTful API Cloud Store
-  try {
-    fetch("https://api.restful-api.dev/objects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: topic, data: payload })
-    }).catch(() => {});
-  } catch (e) {}
-
-  // 5. LocalStorage Event
+  // 3. LocalStorage & BroadcastChannel Sync
   try {
     localStorage.setItem(`connect_network_signal_${topic}`, JSON.stringify({ payload: payloadStr, time: Date.now() }));
   } catch (e) {}
@@ -92,7 +74,7 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
     }
   };
 
-  // 1. PeerJS WebRTC Direct Mesh
+  // 1. PeerJS WebRTC Direct Data Channel Mesh
   const cleanupP2P = initPeerJSTransport(cleanCode, uid, isHost, handleIncomingData);
 
   // 2. Storage Event Listener
@@ -106,23 +88,7 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
   };
   window.addEventListener("storage", storageListener);
 
-  // 3. Firebase RTDB REST Polling (every 1s)
-  const pollFirebaseRTDB = setInterval(async () => {
-    if (isClosed) return;
-    try {
-      const res = await fetch(`https://connect-private-default-rtdb.firebaseio.com/rooms/${topic}.json`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && typeof data === "object") {
-          Object.values(data).forEach((val) => {
-            if (val) handleIncomingData(val);
-          });
-        }
-      }
-    } catch (e) {}
-  }, 1000);
-
-  // 4. ntfy.sh SSE Stream
+  // 3. ntfy.sh SSE Push Stream
   let sse = null;
   try {
     sse = new EventSource(`https://ntfy.sh/${topic}/sse?since=all`);
@@ -137,7 +103,7 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
     };
   } catch (e) {}
 
-  // 5. ntfy.sh Polling (every 1.2s)
+  // 4. ntfy.sh Polling Backup (every 1s)
   const pollNtfy = setInterval(async () => {
     if (isClosed) return;
     try {
@@ -154,13 +120,12 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
         });
       }
     } catch (e) {}
-  }, 1200);
+  }, 1000);
 
   return () => {
     isClosed = true;
     cleanupP2P();
     window.removeEventListener("storage", storageListener);
-    clearInterval(pollFirebaseRTDB);
     clearInterval(pollNtfy);
     if (sse) sse.close();
   };
