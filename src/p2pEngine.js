@@ -10,8 +10,9 @@ export function initPeerJSTransport(roomCode, uid, isHost, onDataReceived) {
   const cleanCode = (roomCode || "").trim().toLowerCase();
   if (!cleanCode) return () => {};
 
+  const hostId = `connect_room_${cleanCode}_host`;
   const peerId = isHost
-    ? `connect_room_${cleanCode}_host`
+    ? hostId
     : `connect_room_${cleanCode}_peer_${Math.random().toString(36).substring(2, 7)}`;
 
   try {
@@ -31,10 +32,9 @@ export function initPeerJSTransport(roomCode, uid, isHost, onDataReceived) {
       }
     });
 
-    activePeer.on("open", (id) => {
-      if (!isHost) {
-        // Connect to host peer ID
-        connectToPeerHost(`connect_room_${cleanCode}_host`, onDataReceived);
+    activePeer.on("open", () => {
+      if (!isHost || peerId !== hostId) {
+        connectToPeerHost(hostId, onDataReceived);
       }
     });
 
@@ -57,12 +57,14 @@ export function initPeerJSTransport(roomCode, uid, isHost, onDataReceived) {
       });
     });
 
-    activePeer.on("error", () => {
-      // Re-attempt connecting if host was initializing
-      if (!isHost && activePeer && !activePeer.destroyed) {
+    activePeer.on("error", (err) => {
+      if (err && err.type === "unavailable-id") {
+        // ID taken by Host, connect as peer client
+        connectToPeerHost(hostId, onDataReceived);
+      } else {
         setTimeout(() => {
-          connectToPeerHost(`connect_room_${cleanCode}_host`, onDataReceived);
-        }, 1500);
+          connectToPeerHost(hostId, onDataReceived);
+        }, 1200);
       }
     });
   } catch (err) {}
@@ -81,6 +83,8 @@ export function initPeerJSTransport(roomCode, uid, isHost, onDataReceived) {
 
 function connectToPeerHost(hostPeerId, onDataReceived) {
   if (!activePeer || activePeer.destroyed) return;
+  if (peerConnections.has(hostPeerId)) return;
+
   try {
     const conn = activePeer.connect(hostPeerId, { reliable: true });
 

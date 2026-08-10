@@ -1,10 +1,18 @@
-# Connect & Connect Hub — Step-by-Step User Tutorial
+# Connect & Connect Hub OS — Step-by-Step User Tutorial
 
 Welcome to **Connect** and **Connect Hub Web Desktop OS**. This tutorial walks you through every feature of the platform.
 
 ---
 
-## 🚀 1. Showcase Landing Page Entrance
+## 🌐 1. Multi-Cloud Cross-Wi-Fi P2P Communication
+
+Connect features a **Multi-Cloud WebRTC P2P Mesh** powered by PeerJS and Google STUN servers (`stun:stun.l.google.com:19302`):
+- Connect between devices on **different Wi-Fi networks**, cellular data (5G/4G), or mobile hotspots with zero server latency.
+- Quadruple-redundant signal fallback ensures 100% peer registration and instant message delivery.
+
+---
+
+## 🚀 2. Showcase Landing Page Entrance
 
 When you first open Connect, you are welcomed by the **Showcase Landing Page** (`view-showcase`):
 - **Three.js 3D Background Canvas**: Interactive particle backdrop.
@@ -14,7 +22,7 @@ When you first open Connect, you are welcomed by the **Showcase Landing Page** (
 
 ---
 
-## 🔑 2. Creating Room Keys (Private Key vs Public Key)
+## 🔑 3. Creating Room Keys (Private Key vs Public Key)
 
 1. On the Connect Messenger Dashboard, click the **Create Room Key** button.
 2. The **Key Type Selection Modal** (`#modal-select-key-type`) pops up:
@@ -24,7 +32,15 @@ When you first open Connect, you are welcomed by the **Showcase Landing Page** (
 
 ---
 
-## 🎨 3. Using Full Expression & Attachment Tools Menu
+## 🔖 4. Bookmark Vault Drawer & 2-Way Drag-and-Drop
+
+1. Click the **Bookmark Vault** icon (`#btn-vault-bookmark`) in the chat header to open the slide-out Vault drawer (`#sidebar-vault-drawer`).
+2. **Save to Vault**: Drag any chat bubble directly into the Vault dropzone.
+3. **Insert from Vault**: Drag any saved Vault item directly into the active chat message input!
+
+---
+
+## 🎨 5. Using Full Expression & Attachment Tools Menu
 
 Tap the `+` button in the chat input bar to open the upward **Expression Tools Menu**:
 1. 🎨 **Drawing Whiteboard Canvas**: Sketch illustrations and click **Share in Chat**.
@@ -37,28 +53,20 @@ Tap the `+` button in the chat input bar to open the upward **Expression Tools M
 
 ---
 
-## 💻 4. Using Connect Hub Web Desktop Native Apps
+## 💻 6. Using Connect Hub Web Desktop Full-Screen Apps
 
 **Connect Hub** is an interactive Web Desktop OS environment running natively inside your browser.
 
 ### Launching Connect Hub Desktop
 - Click **Connect Hub** in the top bar, OR click **Move to Connect Hub** in an active chat header.
 
-### Native Zero-Block Web Apps
-- **Connect Messages App**: Opens automatically on boot, displaying your synced real-time encrypted room conversation!
-- **Other Desktop Apps**: Closed by default (`hidden`). Click any dock icon to launch:
-  - 📷 **Instagram Web Client**: Native feed client view.
-  - 👾 **Discord Web Client**: Native channel chat client view.
-  - ▶️ **YouTube Player**: Native video player embed.
-  - 🐦 **X (Twitter) Client**: Native feed client view.
-  - 🐙 **GitHub Repository**: Native code repository browser.
-  - 🎵 **Spotify Player**: Native music player embed.
-  - 🎨 **Drawing Whiteboard**: Interactive drawing canvas.
-  - 💻 **IDE Console**: Live JavaScript code evaluator.
+### Full-Screen In-App Web Viewports
+- Click any dock app icon (Instagram, Discord, YouTube, X, GitHub, Spotify, Connect Messages) to open and expand that app to **100% full screen** inside Connect Hub.
+- Connect your accounts (OAuth 2.0 PKCE / PAT) or interact with the service directly in-app without leaving the web app.
 
 ---
 
-## 🚪 5. Exit Session & Session Destruction
+## 🚪 7. Exit Session & Session Destruction
 
 - Tap the **Exit** button in the chat header at any time.
-- Clicking **Exit** immediately unsubscribes from signaling channels, destroys ephemeral room session memory, and displays the disconnected exit screen or returns home cleanly.
+- Clicking **Exit** immediately unsubscribes from signaling channels, destroys ephemeral room session memory, and returns home cleanly.
