@@ -70,7 +70,19 @@ export const buttons = {
   openStickers: document.getElementById("btn-open-stickers"),
   closeStickers: document.getElementById("btn-close-stickers-modal"),
   openGifs: document.getElementById("btn-open-gifs"),
-  closeGifs: document.getElementById("btn-close-gifs-modal")
+  closeGifs: document.getElementById("btn-close-gifs-modal"),
+  openVaultModal: document.getElementById("btn-open-vault-modal"),
+  closeVaultModal: document.getElementById("btn-close-vault-modal"),
+  openSoundboard: document.getElementById("btn-open-soundboard"),
+  closeSoundboardModal: document.getElementById("btn-close-soundboard-modal"),
+  lockVaultAgain: document.getElementById("btn-lock-vault-again"),
+  btnVaultBookmark: document.getElementById("btn-vault-bookmark"),
+  btnCloseVaultSidebar: document.getElementById("btn-close-vault-sidebar"),
+  ctxDelete: document.getElementById("btn-ctx-delete"),
+  ctxShare: document.getElementById("btn-ctx-share"),
+  ctxExportMsgJpg: document.getElementById("btn-ctx-export-msg-jpg"),
+  ctxExportChatJpg: document.getElementById("btn-ctx-export-chat-jpg"),
+  ctxSaveVault: document.getElementById("btn-ctx-save-vault")
 };
 
 export const inputs = {
@@ -91,7 +103,8 @@ export const inputs = {
   settingSelectFont: document.getElementById("setting-select-font"),
   settingSelectGrayscale: document.getElementById("setting-select-grayscale"),
   profileBioInput: document.getElementById("profile-bio-input"),
-  profileStatusInput: document.getElementById("profile-status-input")
+  profileStatusInput: document.getElementById("profile-status-input"),
+  inputVaultPin: document.getElementById("input-vault-pin")
 };
 
 export const displays = {
@@ -113,6 +126,9 @@ export const displays = {
   chatHeaderUsername: document.getElementById("chat-header-username"),
   friendsListContainer: document.getElementById("friends-list-container"),
   sidebarFriendsDrawer: document.getElementById("sidebar-friends-drawer"),
+  sidebarVaultDrawer: document.getElementById("sidebar-vault-drawer"),
+  vaultDropzone: document.getElementById("vault-dropzone"),
+  vaultDrawerRecordsList: document.getElementById("vault-drawer-records-list"),
   inviteFriendsListContainer: document.getElementById("invite-friends-list-container"),
   roomMembersListContainer: document.getElementById("room-members-list-container"),
   savedPublicRoomsContainer: document.getElementById("saved-public-rooms-container"),
@@ -127,19 +143,19 @@ export const displays = {
   modalRoomMembers: document.getElementById("modal-room-members"),
   modalStickersPicker: document.getElementById("modal-stickers-picker"),
   modalGifsPicker: document.getElementById("modal-gifs-picker"),
+  modalVaultLock: document.getElementById("modal-vault-lock"),
+  modalSoundboardFx: document.getElementById("modal-soundboard-fx"),
+  messageContextMenu: document.getElementById("message-context-menu"),
+  vaultLockedScreen: document.getElementById("vault-locked-screen"),
+  vaultUnlockedScreen: document.getElementById("vault-unlocked-screen"),
+  vaultRecordsList: document.getElementById("vault-records-list"),
   profileCardHandle: document.getElementById("profile-card-handle"),
   profileCardStatus: document.getElementById("profile-card-status"),
   profileCardBio: document.getElementById("profile-card-bio"),
   profileCardBanner: document.getElementById("profile-card-banner"),
   profileCardFriendKey: document.getElementById("profile-card-friend-key"),
-  messagesList: document.getElementById("messages-list"),
   messagesContainer: document.getElementById("messages-container"),
-  overlayDisconnected: document.getElementById("overlay-disconnected"),
-  overlaySubtitleDesc: document.getElementById("overlay-subtitle-desc"),
-  toast: document.getElementById("toast"),
   typingIndicator: document.getElementById("typing-indicator"),
-  landingUsernameLabel: document.getElementById("landing-username-label"),
-  chatHeaderUsername: document.getElementById("chat-header-username"),
   dropdownToolsMenu: document.getElementById("dropdown-tools-menu"),
   lightboxModal: document.getElementById("lightbox-modal"),
   lightboxImg: document.getElementById("lightbox-img")
@@ -337,6 +353,11 @@ export function renderMessages(messages, currentUid, targetContainer = displays.
 
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
+    bubble.setAttribute("draggable", "true");
+    bubble.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", msg.text || "[Media attachment]");
+      e.dataTransfer.setData("application/json", JSON.stringify(msg));
+    });
 
     if (msg.mediaType === "audio" && msg.mediaUrl) {
       const audioEl = document.createElement("audio");

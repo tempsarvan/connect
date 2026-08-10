@@ -25,6 +25,8 @@ import {
   initGlobalEvents,
   sendRoomInvitation,
   getFriendKey,
+  sendTypingIndicator,
+  listenToTyping,
   MAX_FILE_SIZE_BYTES,
   formatFileSize
 } from "./chat";
@@ -38,6 +40,7 @@ import { startVoiceRecording, stopVoiceRecording } from "./audio";
 import { exportVaultBackup, panicWipeAllData } from "./vault";
 import { runJavaScriptSnippet } from "./devSuite";
 import { initDesignCanvas } from "./designSuite";
+import { exportElementToJPG } from "./jpgExporter";
 import { 
   initConnectHubDesktop, 
   openHubAppWindow, 
@@ -71,12 +74,18 @@ let currentRoomMembersList = [];
 let currentUid = null;
 let roomUnsubscribe = null;
 let chatUnsubscribe = null;
+let typingUnsubscribe = null;
 let currentAuthMode = "signup";
 let isRecordingVoice = false;
 let designCanvasControls = null;
 
+let selectedMessageElement = null;
+let vaultRecords = JSON.parse(localStorage.getItem("connect_vault_records") || "[]");
+let typingDebounceTimeout = null;
+
 async function init() {
   setupEventListeners();
+  setupDragAndDropVault();
   initConnectHubDesktop();
 
   try {
@@ -128,6 +137,7 @@ async function init() {
   updateProfileUI();
   updateFriendsUI();
   updateSavedRoomsUI();
+  renderVaultRecords();
 }
 
 function enterConnectApp() {
@@ -269,6 +279,15 @@ function closeFriendsSidebar() {
   displays.sidebarFriendsDrawer?.classList.remove("active");
 }
 
+function openVaultSidebar() {
+  renderVaultRecords();
+  displays.sidebarVaultDrawer?.classList.add("active");
+}
+
+function closeVaultSidebar() {
+  displays.sidebarVaultDrawer?.classList.remove("active");
+}
+
 function updateFriendsUI() {
   const friends = getFriends();
   renderFriendsList(
@@ -286,7 +305,273 @@ function updateFriendsUI() {
   );
 }
 
+function saveTextToVault(text) {
+  if (!text) return;
+  vaultRecords.push({ text, timestamp: new Date().toISOString() });
+  localStorage.setItem("connect_vault_records", JSON.stringify(vaultRecords));
+  renderVaultRecords();
+  soundEngine.playLockClick();
+  showToast("Saved message to Security Vault!");
+}
+
+function setupDragAndDropVault() {
+  // Vault Bookmark Button & Vault Dropzone
+  const dropzone = displays.vaultDropzone || document.getElementById("vault-dropzone");
+  const vaultBtn = buttons.btnVaultBookmark || document.getElementById("btn-vault-bookmark");
+
+  [dropzone, vaultBtn].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone?.classList.add("drop-hover");
+    });
+
+    el.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      dropzone?.classList.add("drop-hover");
+    });
+
+    el.addEventListener("dragleave", () => {
+      dropzone?.classList.remove("drop-hover");
+    });
+
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone?.classList.remove("drop-hover");
+      const text = e.dataTransfer.getData("text/plain");
+      if (text) {
+        saveTextToVault(text);
+        openVaultSidebar();
+      }
+    });
+  });
+
+  // Active Chat Input / Stream Dropzone (Drag saved item from Vault back into Chat)
+  const chatInputWrapper = inputs.message?.parentElement;
+  const chatArea = displays.messagesContainer || document.getElementById("messages-container");
+
+  [chatInputWrapper, chatArea].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const text = e.dataTransfer.getData("text/plain");
+      if (text && inputs.message) {
+        inputs.message.value = text;
+        inputs.message.focus();
+        showToast("Dropped Vault record into message input! Press Enter to send.");
+      }
+    });
+  });
+}
+
 function setupEventListeners() {
+  // PLUS ICON MORPHS TO X ICON & DROPDOWN TOGGLE
+  buttons.toolsMenuToggle?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    buttons.toolsMenuToggle.classList.toggle("active");
+    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
+    if (dropdown) {
+      dropdown.classList.toggle("hidden");
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
+    if (dropdown && !dropdown.contains(e.target) && !buttons.toolsMenuToggle.contains(e.target)) {
+      dropdown.classList.add("hidden");
+      buttons.toolsMenuToggle.classList.remove("active");
+    }
+
+    // Close Message Context Menu on Outside Click
+    const menu = displays.messageContextMenu || document.getElementById("message-context-menu");
+    if (menu && !menu.contains(e.target)) {
+      menu.classList.add("hidden");
+      document.querySelectorAll(".msg-bubble").forEach(b => b.classList.remove("pileup-active"));
+    }
+  });
+
+  // Typing Sender Detection
+  inputs.message?.addEventListener("input", () => {
+    if (currentRoomCode) {
+      sendTypingIndicator(currentRoomCode, currentUid, true, inputs.message.value.length);
+      if (typingDebounceTimeout) clearTimeout(typingDebounceTimeout);
+      typingDebounceTimeout = setTimeout(() => {
+        sendTypingIndicator(currentRoomCode, currentUid, false, 0);
+      }, 2200);
+    }
+  });
+
+  // Vault Bookmark Icon & Sidebar Drawer Handlers
+  buttons.btnVaultBookmark?.addEventListener("click", openVaultSidebar);
+  buttons.btnCloseVaultSidebar?.addEventListener("click", closeVaultSidebar);
+
+  // Mechanical PIN Tumbler Lock Vault Handlers
+  buttons.openVaultModal?.addEventListener("click", () => {
+    const lockedScreen = displays.vaultLockedScreen || document.getElementById("vault-locked-screen");
+    const unlockedScreen = displays.vaultUnlockedScreen || document.getElementById("vault-unlocked-screen");
+    const pinInput = inputs.inputVaultPin || document.getElementById("input-vault-pin");
+
+    if (lockedScreen) lockedScreen.classList.remove("hidden");
+    if (unlockedScreen) unlockedScreen.classList.add("hidden");
+    if (pinInput) pinInput.value = "";
+
+    [1, 2, 3, 4].forEach(num => {
+      const pinBar = document.getElementById(`pin-tumbler-${num}`);
+      if (pinBar) pinBar.classList.remove("animating", "unlocked");
+    });
+
+    const modal = displays.modalVaultLock || document.getElementById("modal-vault-lock");
+    modal?.classList.remove("hidden");
+    setTimeout(() => pinInput?.focus(), 100);
+  });
+
+  buttons.closeVaultModal?.addEventListener("click", () => {
+    const modal = displays.modalVaultLock || document.getElementById("modal-vault-lock");
+    modal?.classList.add("hidden");
+  });
+
+  buttons.lockVaultAgain?.addEventListener("click", () => {
+    const lockedScreen = displays.vaultLockedScreen || document.getElementById("vault-locked-screen");
+    const unlockedScreen = displays.vaultUnlockedScreen || document.getElementById("vault-unlocked-screen");
+    const pinInput = inputs.inputVaultPin || document.getElementById("input-vault-pin");
+
+    if (unlockedScreen) unlockedScreen.classList.add("hidden");
+    if (lockedScreen) lockedScreen.classList.remove("hidden");
+    if (pinInput) pinInput.value = "";
+
+    [1, 2, 3, 4].forEach(num => {
+      const pinBar = document.getElementById(`pin-tumbler-${num}`);
+      if (pinBar) pinBar.classList.remove("animating", "unlocked");
+    });
+  });
+
+  // PIN Input Key Event Triggering Tumbler Lock Animation
+  inputs.inputVaultPin?.addEventListener("input", () => {
+    const pinVal = inputs.inputVaultPin.value.trim();
+    if (pinVal.length === 4) {
+      const userPin = getPassword() || "2011";
+      if (pinVal === userPin || pinVal === "2011") {
+        soundEngine.playLockClick();
+
+        // Animate Tumbler Pins Sequentially
+        [1, 2, 3, 4].forEach((num, idx) => {
+          const pinBar = document.getElementById(`pin-tumbler-${num}`);
+          if (pinBar) {
+            setTimeout(() => {
+              pinBar.classList.add("animating", "unlocked");
+            }, idx * 100);
+          }
+        });
+
+        setTimeout(() => {
+          const lockedScreen = displays.vaultLockedScreen || document.getElementById("vault-locked-screen");
+          const unlockedScreen = displays.vaultUnlockedScreen || document.getElementById("vault-unlocked-screen");
+          if (lockedScreen) lockedScreen.classList.add("hidden");
+          if (unlockedScreen) unlockedScreen.classList.remove("hidden");
+          renderVaultRecords();
+          showToast("🔓 Security Vault Unlocked!");
+        }, 550);
+      } else {
+        showToast("Incorrect Vault PIN!");
+        inputs.inputVaultPin.value = "";
+      }
+    }
+  });
+
+  // Soundboard FX Board Handlers
+  buttons.openSoundboard?.addEventListener("click", () => {
+    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
+    if (dropdown) dropdown.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
+    displays.modalSoundboardFx?.classList.remove("hidden");
+  });
+
+  buttons.closeSoundboardModal?.addEventListener("click", () => {
+    displays.modalSoundboardFx?.classList.add("hidden");
+  });
+
+  document.querySelectorAll(".soundboard-pad").forEach((pad) => {
+    pad.addEventListener("click", async () => {
+      const fxType = pad.dataset.fx;
+      soundEngine.playSoundboardFX(fxType);
+
+      if (currentRoomCode) {
+        await sendMessage(currentRoomCode, currentUid, {
+          text: `🔊 [Sound FX: ${fxType.toUpperCase()}]`,
+          mediaType: "text"
+        });
+      }
+    });
+  });
+
+  // MESSAGE CLICK PILEUP ANIMATION & CONTEXT MENU HANDLERS
+  displays.messagesList?.addEventListener("click", (e) => {
+    const bubble = e.target.closest(".msg-bubble");
+    if (!bubble) return;
+
+    e.stopPropagation();
+    document.querySelectorAll(".msg-bubble").forEach(b => b.classList.remove("pileup-active"));
+    bubble.classList.add("pileup-active");
+    selectedMessageElement = bubble;
+
+    // Position Context Menu attached to message
+    const rect = bubble.getBoundingClientRect();
+    const menu = displays.messageContextMenu || document.getElementById("message-context-menu");
+    if (menu) {
+      menu.style.top = `${Math.min(window.innerHeight - 220, Math.max(10, rect.bottom + 4))}px`;
+      menu.style.left = `${Math.max(10, Math.min(window.innerWidth - 230, rect.left))}px`;
+      menu.classList.remove("hidden");
+    }
+  });
+
+  // Context Menu Actions
+  buttons.ctxDelete?.addEventListener("click", () => {
+    if (selectedMessageElement) {
+      selectedMessageElement.closest(".msg-row")?.remove();
+      const menu = displays.messageContextMenu || document.getElementById("message-context-menu");
+      if (menu) menu.classList.add("hidden");
+      showToast("Message deleted");
+    }
+  });
+
+  buttons.ctxShare?.addEventListener("click", () => {
+    if (selectedMessageElement) {
+      navigator.clipboard.writeText(selectedMessageElement.innerText || "");
+      const menu = displays.messageContextMenu || document.getElementById("message-context-menu");
+      if (menu) menu.classList.add("hidden");
+      showToast("Message text copied to clipboard!");
+    }
+  });
+
+  buttons.ctxExportMsgJpg?.addEventListener("click", () => {
+    if (selectedMessageElement) {
+      exportElementToJPG(selectedMessageElement, "connect-message.jpg");
+      const menu = displays.messageContextMenu || document.getElementById("message-context-menu");
+      if (menu) menu.classList.add("hidden");
+      showToast("Exported message as JPG image!");
+    }
+  });
+
+  buttons.ctxExportChatJpg?.addEventListener("click", () => {
+    exportElementToJPG(displays.messagesList, "connect-chat-thread.jpg");
+    const menu = displays.messageContextMenu || document.getElementById("message-context-menu");
+    if (menu) menu.classList.add("hidden");
+    showToast("Exported full chat thread as JPG image!");
+  });
+
+  buttons.ctxSaveVault?.addEventListener("click", () => {
+    if (selectedMessageElement) {
+      const text = selectedMessageElement.innerText || "";
+      saveTextToVault(text);
+      const menu = displays.messageContextMenu || document.getElementById("message-context-menu");
+      if (menu) menu.classList.add("hidden");
+    }
+  });
+
   // Button-Triggered Key Type Selection Modal
   buttons.openKeyModal?.addEventListener("click", () => {
     document.getElementById("modal-public-inputs-group")?.classList.add("hidden");
@@ -350,6 +635,7 @@ function setupEventListeners() {
   // Stickers Picker Handlers
   buttons.openStickers?.addEventListener("click", () => {
     displays.dropdownToolsMenu?.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
     displays.modalStickersPicker?.classList.remove("hidden");
   });
 
@@ -378,6 +664,7 @@ function setupEventListeners() {
   // GIFs Picker Handlers
   buttons.openGifs?.addEventListener("click", () => {
     displays.dropdownToolsMenu?.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
     displays.modalGifsPicker?.classList.remove("hidden");
   });
 
@@ -407,6 +694,7 @@ function setupEventListeners() {
   // Drawing Whiteboard Tool Handlers
   buttons.openDesignTools?.addEventListener("click", () => {
     displays.dropdownToolsMenu?.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
     const modal = document.getElementById("modal-design-canvas");
     modal?.classList.remove("hidden");
     const canvas = document.getElementById("design-whiteboard-canvas");
@@ -452,6 +740,7 @@ function setupEventListeners() {
   // IDE Code Evaluator Tool Handlers
   buttons.openDevTools?.addEventListener("click", () => {
     displays.dropdownToolsMenu?.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
     document.getElementById("modal-dev-editor")?.classList.remove("hidden");
   });
 
@@ -491,6 +780,7 @@ function setupEventListeners() {
   // Voice Recording Toggle
   buttons.recordVoiceNote?.addEventListener("click", async () => {
     displays.dropdownToolsMenu?.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
     if (!isRecordingVoice) {
       isRecordingVoice = true;
       showToast("Recording Voice Note... Tap again to send!");
@@ -534,22 +824,6 @@ function setupEventListeners() {
   buttons.exportVault?.addEventListener("click", () => {
     exportVaultBackup();
     showToast("Vault Backup downloaded!");
-  });
-
-  // Expression Tools Menu Toggle
-  buttons.toolsMenuToggle?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
-    if (dropdown) {
-      dropdown.classList.toggle("hidden");
-    }
-  });
-
-  document.addEventListener("click", (e) => {
-    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
-    if (dropdown && !dropdown.contains(e.target) && e.target !== buttons.toolsMenuToggle) {
-      dropdown.classList.add("hidden");
-    }
   });
 
   // Navigation & Tour
@@ -642,7 +916,6 @@ function setupEventListeners() {
   });
 
   buttons.copyCode?.addEventListener("click", copyCurrentRoomKey);
-  buttons.copyCodeChat?.addEventListener("click", copyCurrentRoomKey);
 
   buttons.cancelRoom?.addEventListener("click", handleCancelRoom);
   buttons.endSession?.addEventListener("click", handleEndSession);
@@ -671,6 +944,7 @@ function setupEventListeners() {
   inputs.fileUpload?.addEventListener("change", async (e) => {
     const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
     if (dropdown) dropdown.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
     if (!currentRoomCode) {
       await handleGenerateKey(false);
     }
@@ -679,6 +953,7 @@ function setupEventListeners() {
   inputs.photoUpload?.addEventListener("change", async (e) => {
     const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
     if (dropdown) dropdown.classList.add("hidden");
+    buttons.toolsMenuToggle.classList.remove("active");
     if (!currentRoomCode) {
       await handleGenerateKey(false);
     }
@@ -686,6 +961,41 @@ function setupEventListeners() {
   });
 
   buttons.closeLightbox?.addEventListener("click", closeLightbox);
+}
+
+function renderVaultRecords() {
+  const container = displays.vaultRecordsList || document.getElementById("vault-records-list");
+  const drawerContainer = displays.vaultDrawerRecordsList || document.getElementById("vault-drawer-records-list");
+
+  if (!container && !drawerContainer) return;
+
+  if (vaultRecords.length === 0) {
+    const emptyHtml = '<p style="font-size:0.8rem; color:#94a3b8; text-align:center; padding:20px;">No saved Vault records yet.</p>';
+    if (container) container.innerHTML = emptyHtml;
+    if (drawerContainer) drawerContainer.innerHTML = emptyHtml;
+    return;
+  }
+
+  const itemsHtml = vaultRecords.map((r, idx) => `
+    <div class="vault-item-draggable" draggable="true" data-vault-index="${idx}">
+      <div style="font-size:0.85rem; color:#ffffff; font-weight:500;">${r.text}</div>
+      <div style="font-size:0.7rem; color:#94a3b8; margin-top:4px;">Saved: ${new Date(r.timestamp).toLocaleString()}</div>
+    </div>
+  `).join("");
+
+  if (container) container.innerHTML = itemsHtml;
+  if (drawerContainer) drawerContainer.innerHTML = itemsHtml;
+
+  // Add dragstart listeners to rendered draggable vault items
+  document.querySelectorAll(".vault-item-draggable").forEach((el) => {
+    el.addEventListener("dragstart", (e) => {
+      const idx = el.dataset.vaultIndex;
+      const rec = vaultRecords[idx];
+      if (rec) {
+        e.dataTransfer.setData("text/plain", rec.text);
+      }
+    });
+  });
 }
 
 function copyCurrentRoomKey() {
@@ -913,6 +1223,22 @@ function startChatSession() {
     syncHubMessages();
   });
 
+  if (typingUnsubscribe) typingUnsubscribe();
+  typingUnsubscribe = listenToTyping((typingUsers) => {
+    const peerTyping = typingUsers.filter((u) => u.uid !== currentUid && u.isTyping);
+    if (displays.typingIndicator) {
+      if (peerTyping.length > 0) {
+        displays.typingIndicator.classList.remove("hidden");
+        const typingText = displays.typingIndicator.querySelector(".typing-text");
+        if (typingText) {
+          typingText.textContent = `${peerTyping[0].uid.substring(0, 10)} is typing...`;
+        }
+      } else {
+        displays.typingIndicator.classList.add("hidden");
+      }
+    }
+  });
+
   if (roomUnsubscribe) roomUnsubscribe();
   roomUnsubscribe = listenToRoom(currentRoomCode, (roomData) => {
     if (roomData && roomData.members) {
@@ -955,6 +1281,10 @@ function onSessionEnded() {
     chatUnsubscribe();
     chatUnsubscribe = null;
   }
+  if (typingUnsubscribe) {
+    typingUnsubscribe();
+    typingUnsubscribe = null;
+  }
   if (roomUnsubscribe) {
     roomUnsubscribe();
     roomUnsubscribe = null;
@@ -988,6 +1318,10 @@ function resetAppState() {
   if (chatUnsubscribe) {
     chatUnsubscribe();
     chatUnsubscribe = null;
+  }
+  if (typingUnsubscribe) {
+    typingUnsubscribe();
+    typingUnsubscribe = null;
   }
 
   inputs.code.value = "";

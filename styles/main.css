@@ -679,9 +679,17 @@
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
+.btn-tools-toggle svg {
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .btn-tools-toggle:hover {
   background: var(--surface-hover);
   transform: scale(1.06);
+}
+
+.btn-tools-toggle.active svg {
+  transform: rotate(45deg);
 }
 
 .tools-dropdown-menu {
@@ -3515,4 +3523,299 @@ body[data-grayscale-scheme="charcoal"] {
   color: #ffffff;
   letter-spacing: 0.1em;
 }
+
+/* ===================================================
+   HUMAN-MADE EMOTIONAL TEXT EXPRESSION ANIMATIONS
+   =================================================== */
+@keyframes excitedBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-5px) scale(1.04); }
+  60% { transform: translateY(2px) scale(0.98); }
+}
+.msg-emotion-excited {
+  animation: excitedBounce 1.2s infinite ease-in-out !important;
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25) !important;
+}
+
+@keyframes lovePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(244, 114, 182, 0.2); }
+  50% { transform: scale(1.03); box-shadow: 0 0 24px rgba(244, 114, 182, 0.45); }
+}
+.msg-emotion-love {
+  animation: lovePulse 1.8s infinite ease-in-out !important;
+  border-color: rgba(244, 114, 182, 0.5) !important;
+}
+
+@keyframes angryTremor {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  60% { transform: translateX(2px); }
+}
+.msg-emotion-angry {
+  animation: angryTremor 180ms infinite ease-in-out !important;
+  border-color: rgba(239, 68, 68, 0.7) !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.3) !important;
+}
+
+@keyframes calmWave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.msg-emotion-calm {
+  animation: calmWave 3s infinite ease-in-out !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
+}
+
+.msg-emotion-whisper {
+  opacity: 0.8 !important;
+  backdrop-filter: blur(4px) !important;
+  font-style: italic !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+@keyframes celebrateShimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.msg-emotion-celebrate {
+  background: linear-gradient(90deg, #1e1b4b, #312e81, #1e1b4b) !important;
+  background-size: 200% 200% !important;
+  animation: celebrateShimmer 2s infinite linear !important;
+  border-color: rgba(168, 85, 247, 0.6) !important;
+}
+
+/* MESSAGE PILEUP & CONTEXT MENU */
+.msg-bubble.pileup-active {
+  transform: translateY(-8px) scale(1.02) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 255, 255, 0.15) !important;
+  z-index: 50 !important;
+}
+
+.message-context-menu {
+  position: fixed !important;
+  background: rgba(15, 20, 32, 0.95);
+  backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+  z-index: 9999 !important;
+  width: 220px;
+  animation: popUpFromTypebar 180ms ease-out forwards;
+}
+
+.message-context-menu.hidden {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* EMOTION PICKER PILLS */
+.emotion-picker-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+
+.btn-emotion-pill {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-emotion-pill:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.btn-emotion-pill.active {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* MECHANICAL PIN TUMBLER LOCK VAULT */
+.vault-lock-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.vault-lock-container.hidden,
+.vault-records-container.hidden {
+  display: none !important;
+}
+
+.tumbler-lock-illustration {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.tumbler-cylinder {
+  width: 38px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+}
+
+.tumbler-pin-bar {
+  width: 14px;
+  height: 36px;
+  background: linear-gradient(180deg, #94a3b8 0%, #475569 100%);
+  border-radius: 4px;
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tumbler-pin-bar.unlocked {
+  transform: translateY(-24px);
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+  box-shadow: 0 0 10px #38bdf8;
+}
+
+@keyframes pinLiftAnim {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-28px); }
+  100% { transform: translateY(-24px); }
+}
+
+.tumbler-pin-bar.animating {
+  animation: pinLiftAnim 400ms ease-out forwards;
+}
+
+/* SOUNDBOARD FX BOARD */
+.soundboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.soundboard-pad {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.soundboard-pad:hover {
+  transform: scale(1.08);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: #ffffff;
+}
+
+.soundboard-pad:active {
+  transform: scale(0.96);
+}
+
+/* VAULT DROPZONE & DRAG-AND-DROP VAULT DRAWER */
+.vault-dropzone {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  cursor: pointer;
+}
+
+.vault-dropzone.drop-hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: #ffffff !important;
+  transform: scale(1.02);
+}
+
+.msg-bubble {
+  cursor: grab;
+}
+
+.msg-bubble:active {
+  cursor: grabbing;
+}
+
+.vault-item-draggable {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: grab;
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.vault-item-draggable:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #ffffff;
+  transform: translateX(4px);
+}
+
+.vault-item-draggable:active {
+  cursor: grabbing;
+}
+
+
 

@@ -343,7 +343,8 @@ export async function sendMessage(roomCode, uid, payload) {
   const mediaType = typeof payload === "object" ? payload.mediaType || "text" : "text";
   const mediaUrl = typeof payload === "object" ? payload.mediaUrl || null : null;
   const replyTo = typeof payload === "object" ? payload.replyTo || null : null;
-  const effectMode = typeof payload === "object" ? payload.effectMode || "normal" : "normal";
+  const emotion = typeof payload === "object" ? payload.emotion || payload.effectMode || "none" : "none";
+  const effectMode = emotion;
   const fileName = typeof payload === "object" ? payload.fileName || null : null;
   const fileSize = typeof payload === "object" ? payload.fileSize || null : null;
   const fileSizeBytes = typeof payload === "object" ? payload.fileSizeBytes || null : null;
@@ -371,6 +372,7 @@ export async function sendMessage(roomCode, uid, payload) {
     mediaType,
     mediaUrl,
     replyTo,
+    emotion,
     effectMode,
     fileName,
     fileSize: fileSize || (fileSizeBytes ? formatFileSize(fileSizeBytes) : null),
