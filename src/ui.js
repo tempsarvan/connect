@@ -140,6 +140,7 @@ export const displays = {
   typingIndicator: document.getElementById("typing-indicator"),
   landingUsernameLabel: document.getElementById("landing-username-label"),
   chatHeaderUsername: document.getElementById("chat-header-username"),
+  dropdownToolsMenu: document.getElementById("dropdown-tools-menu"),
   lightboxModal: document.getElementById("lightbox-modal"),
   lightboxImg: document.getElementById("lightbox-img")
 };

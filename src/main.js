@@ -360,7 +360,10 @@ function setupEventListeners() {
   document.querySelectorAll(".sticker-tile").forEach((tile) => {
     tile.addEventListener("click", async () => {
       const stickerType = tile.dataset.sticker;
-      if (stickerType && currentRoomCode) {
+      if (stickerType) {
+        if (!currentRoomCode) {
+          await handleGenerateKey(false);
+        }
         displays.modalStickersPicker?.classList.add("hidden");
         await sendMessage(currentRoomCode, currentUid, {
           text: `[Sticker: ${stickerType}]`,
@@ -385,7 +388,10 @@ function setupEventListeners() {
   document.querySelectorAll(".gif-tile").forEach((tile) => {
     tile.addEventListener("click", async () => {
       const gifUrl = tile.dataset.gifUrl;
-      if (gifUrl && currentRoomCode) {
+      if (gifUrl) {
+        if (!currentRoomCode) {
+          await handleGenerateKey(false);
+        }
         displays.modalGifsPicker?.classList.add("hidden");
         await sendMessage(currentRoomCode, currentUid, {
           text: "",
@@ -418,7 +424,10 @@ function setupEventListeners() {
   });
 
   buttons.shareCanvas?.addEventListener("click", async () => {
-    if (designCanvasControls && currentRoomCode) {
+    if (designCanvasControls) {
+      if (!currentRoomCode) {
+        await handleGenerateKey(false);
+      }
       const dataUrl = designCanvasControls.exportPNG();
       await sendMessage(currentRoomCode, currentUid, {
         text: "Canvas Whiteboard Sketch",
@@ -465,7 +474,10 @@ function setupEventListeners() {
 
   buttons.shareDevCode?.addEventListener("click", async () => {
     const code = document.getElementById("dev-code-input").value.trim();
-    if (code && currentRoomCode) {
+    if (code) {
+      if (!currentRoomCode) {
+        await handleGenerateKey(false);
+      }
       await sendMessage(currentRoomCode, currentUid, {
         text: `\`\`\`js\n${code}\n\`\`\``,
         mediaType: "text"
@@ -478,7 +490,7 @@ function setupEventListeners() {
 
   // Voice Recording Toggle
   buttons.recordVoiceNote?.addEventListener("click", async () => {
-    displays.dropdownToolsMenu.classList.add("hidden");
+    displays.dropdownToolsMenu?.classList.add("hidden");
     if (!isRecordingVoice) {
       isRecordingVoice = true;
       showToast("Recording Voice Note... Tap again to send!");
@@ -487,7 +499,10 @@ function setupEventListeners() {
       isRecordingVoice = false;
       showToast("Processing Voice Note...");
       const audioUrl = await stopVoiceRecording();
-      if (audioUrl && currentRoomCode) {
+      if (audioUrl) {
+        if (!currentRoomCode) {
+          await handleGenerateKey(false);
+        }
         await sendMessage(currentRoomCode, currentUid, {
           text: "Voice Note",
           mediaType: "audio",
@@ -524,12 +539,16 @@ function setupEventListeners() {
   // Expression Tools Menu Toggle
   buttons.toolsMenuToggle?.addEventListener("click", (e) => {
     e.stopPropagation();
-    displays.dropdownToolsMenu.classList.toggle("hidden");
+    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
+    if (dropdown) {
+      dropdown.classList.toggle("hidden");
+    }
   });
 
   document.addEventListener("click", (e) => {
-    if (displays.dropdownToolsMenu && !displays.dropdownToolsMenu.contains(e.target) && e.target !== buttons.toolsMenuToggle) {
-      displays.dropdownToolsMenu.classList.add("hidden");
+    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
+    if (dropdown && !dropdown.contains(e.target) && e.target !== buttons.toolsMenuToggle) {
+      dropdown.classList.add("hidden");
     }
   });
 
@@ -649,12 +668,20 @@ function setupEventListeners() {
   });
 
   // File Upload Handlers
-  inputs.fileUpload?.addEventListener("change", (e) => {
-    displays.dropdownToolsMenu.classList.add("hidden");
+  inputs.fileUpload?.addEventListener("change", async (e) => {
+    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
+    if (dropdown) dropdown.classList.add("hidden");
+    if (!currentRoomCode) {
+      await handleGenerateKey(false);
+    }
     handleFileUpload(e, currentRoomCode);
   });
-  inputs.photoUpload?.addEventListener("change", (e) => {
-    displays.dropdownToolsMenu.classList.add("hidden");
+  inputs.photoUpload?.addEventListener("change", async (e) => {
+    const dropdown = displays.dropdownToolsMenu || document.getElementById("dropdown-tools-menu");
+    if (dropdown) dropdown.classList.add("hidden");
+    if (!currentRoomCode) {
+      await handleGenerateKey(false);
+    }
     handlePhotoUpload(e, currentRoomCode);
   });
 
@@ -707,7 +734,11 @@ function handleSaveSettings() {
 
 async function handleSendMessage() {
   const text = inputs.message.value.trim();
-  if (!text || !currentRoomCode) return;
+  if (!text) return;
+  
+  if (!currentRoomCode) {
+    await handleGenerateKey(false);
+  }
 
   inputs.message.value = "";
   
@@ -722,13 +753,14 @@ async function handleSendMessage() {
 
 async function handlePhotoUpload(e, targetRoomId) {
   const file = e.target.files[0];
-  if (!file || !targetRoomId) return;
+  const roomId = targetRoomId || currentRoomCode;
+  if (!file || !roomId) return;
 
   try {
     showToast("Processing photo...");
     const dataUrl = await processImageFile(file);
     
-    await sendMessage(targetRoomId, currentUid, {
+    await sendMessage(roomId, currentUid, {
       text: "",
       mediaType: "image",
       mediaUrl: dataUrl
@@ -743,7 +775,8 @@ async function handlePhotoUpload(e, targetRoomId) {
 
 async function handleFileUpload(e, targetRoomId) {
   const file = e.target.files[0];
-  if (!file || !targetRoomId) return;
+  const roomId = targetRoomId || currentRoomCode;
+  if (!file || !roomId) return;
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
     showToast("File exceeds maximum 1 Terabyte (1 TB) size limit.");
@@ -759,7 +792,7 @@ async function handleFileUpload(e, targetRoomId) {
     reader.onload = async () => {
       const dataUrl = reader.result;
       
-      await sendMessage(targetRoomId, currentUid, {
+      await sendMessage(roomId, currentUid, {
         text: file.name,
         mediaType: "file",
         mediaUrl: dataUrl,
