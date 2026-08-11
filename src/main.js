@@ -1,4 +1,5 @@
 import { initAuth, getUserUid } from "./auth";
+import { getActiveFirebaseConfig, saveFirebaseConfig } from "./firebase";
 import { 
   generateRoomCode, 
   createRoom, 
@@ -1018,6 +1019,17 @@ function copyCurrentRoomKey() {
 
 function openFullscreenSettings() {
   updateProfileUI();
+  const fbConfig = getActiveFirebaseConfig();
+  const apiKeyEl = document.getElementById("setting-firebase-api-key");
+  const projIdEl = document.getElementById("setting-firebase-project-id");
+  const authDomEl = document.getElementById("setting-firebase-auth-domain");
+  const appIdEl = document.getElementById("setting-firebase-app-id");
+
+  if (apiKeyEl) apiKeyEl.value = fbConfig.apiKey || "";
+  if (projIdEl) projIdEl.value = fbConfig.projectId || "";
+  if (authDomEl) authDomEl.value = fbConfig.authDomain || "";
+  if (appIdEl) appIdEl.value = fbConfig.appId || "";
+
   displays.modalSettingsFullscreen.classList.remove("hidden");
 }
 
@@ -1031,6 +1043,11 @@ function handleSaveSettings() {
   const font = inputs.settingSelectFont?.value || "inter";
   const grayscale = inputs.settingSelectGrayscale?.value || "obsidian";
 
+  const apiKey = document.getElementById("setting-firebase-api-key")?.value.trim();
+  const projectId = document.getElementById("setting-firebase-project-id")?.value.trim();
+  const authDomain = document.getElementById("setting-firebase-auth-domain")?.value.trim();
+  const appId = document.getElementById("setting-firebase-app-id")?.value.trim();
+
   if (!uname) {
     showToast("Please enter a valid username");
     return;
@@ -1038,6 +1055,17 @@ function handleSaveSettings() {
 
   try {
     saveUserSettings(uname, pwd, true, true, currentUid);
+
+    if (apiKey && projectId) {
+      saveFirebaseConfig({
+        apiKey,
+        projectId,
+        authDomain: authDomain || `${projectId}.firebaseapp.com`,
+        storageBucket: `${projectId}.appspot.com`,
+        appId: appId || "1:1234567890:web:connectapp"
+      });
+      showToast("🔥 Active Firebase Cloud credentials saved!");
+    }
 
     // Apply Customize Connect font & theme
     document.body.dataset.font = font;

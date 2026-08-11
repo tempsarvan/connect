@@ -1,24 +1,19 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+// Connect Primary Firebase Module
+import { 
+  initFirebase, 
+  getFirestoreDB, 
+  getFirebaseAuth, 
+  getActiveFirebaseConfig, 
+  saveFirebaseConfig 
+} from "./firebaseEngine";
 
-const apiKey = import.meta.env.VITE_FIREBASE_API_KEY || "";
-export const isConfigured = Boolean(apiKey && apiKey !== "AIzaSyDemoKeyForConnectApp1234567");
+const { app, db, auth } = initFirebase();
 
-const firebaseConfig = {
-  apiKey: apiKey || "AIzaSyDemoKeyForConnectApp1234567",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "connect-private.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "connect-private",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "connect-private.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789012",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789012:web:connectappdemo"
-};
+export const isConfigured = Boolean(
+  getActiveFirebaseConfig().apiKey && 
+  getActiveFirebaseConfig().apiKey !== "AIzaSyDemoKeyForConnectApp1234567"
+);
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Promise with timeout helper to prevent hanging on Firestore network retries
 export function withTimeout(promise, ms = 1200) {
   if (!isConfigured) {
     return Promise.reject(new Error("Firebase not configured with active key"));
@@ -40,4 +35,4 @@ export function withTimeout(promise, ms = 1200) {
   });
 }
 
-export { app, db, auth };
+export { app, db, auth, getActiveFirebaseConfig, saveFirebaseConfig };

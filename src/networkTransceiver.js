@@ -1,7 +1,13 @@
 // Universal Zero-Fail Network Transceiver Engine for Connect
-// PeerJS WebRTC P2P (9 STUN Servers) + ntfy.sh SSE Push Stream + LocalStorage & BroadcastChannel
+// Integrates Firebase Cloud Firestore Realtime Snapshots, PeerJS WebRTC STUN Mesh, ntfy.sh SSE, and LocalStorage
 
 import { initPeerJSTransport, broadcastPeerData } from "./p2pEngine";
+import { 
+  publishFirebaseChatMessage, 
+  listenFirebaseChatMessages, 
+  publishFirebaseHandshake, 
+  listenFirebaseHandshake 
+} from "./firebaseEngine";
 
 const processedPayloadHashes = new Set();
 
@@ -24,12 +30,21 @@ export function broadcastUniversalPayload(roomCode, payload) {
 
   processedPayloadHashes.add(payloadHash);
 
-  // 1. PeerJS WebRTC Direct Data Channel Mesh (Google & Mozilla STUN)
+  // 1. Firebase Cloud Firestore Realtime Document Sync
+  try {
+    if (payload.type === "JOIN_REQUEST" || payload.type === "ROOM_CREATED" || payload.type === "ROOM_ACTIVE") {
+      publishFirebaseHandshake(cleanCode, payload);
+    } else {
+      publishFirebaseChatMessage(cleanCode, payload);
+    }
+  } catch (e) {}
+
+  // 2. PeerJS WebRTC Direct Data Channel Mesh (Google STUN)
   try {
     broadcastPeerData(payload);
   } catch (e) {}
 
-  // 2. ntfy.sh Global Stream POST
+  // 3. ntfy.sh Global Stream POST
   try {
     fetch(`https://ntfy.sh/${topic}`, {
       method: "POST",
@@ -38,7 +53,7 @@ export function broadcastUniversalPayload(roomCode, payload) {
     }).catch(() => {});
   } catch (e) {}
 
-  // 3. LocalStorage & BroadcastChannel Sync
+  // 4. LocalStorage & BroadcastChannel Sync
   try {
     localStorage.setItem(`connect_network_signal_${topic}`, JSON.stringify({ payload: payloadStr, time: Date.now() }));
   } catch (e) {}
@@ -74,10 +89,14 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
     }
   };
 
-  // 1. PeerJS WebRTC Direct Data Channel Mesh
+  // 1. Firebase Cloud Firestore Realtime Listeners (onSnapshot)
+  const unsubFirebaseMessages = listenFirebaseChatMessages(cleanCode, handleIncomingData);
+  const unsubFirebaseHandshakes = listenFirebaseHandshake(cleanCode, handleIncomingData);
+
+  // 2. PeerJS WebRTC Direct Data Channel Mesh
   const cleanupP2P = initPeerJSTransport(cleanCode, uid, isHost, handleIncomingData);
 
-  // 2. Storage Event Listener
+  // 3. Storage Event Listener
   const storageListener = (e) => {
     if (e.key === `connect_network_signal_${topic}` && e.newValue) {
       try {
@@ -88,7 +107,7 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
   };
   window.addEventListener("storage", storageListener);
 
-  // 3. ntfy.sh SSE Push Stream
+  // 4. ntfy.sh SSE Push Stream
   let sse = null;
   try {
     sse = new EventSource(`https://ntfy.sh/${topic}/sse?since=all`);
@@ -103,7 +122,7 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
     };
   } catch (e) {}
 
-  // 4. ntfy.sh Polling Backup (every 1s)
+  // 5. ntfy.sh Polling Backup (every 1s)
   const pollNtfy = setInterval(async () => {
     if (isClosed) return;
     try {
@@ -124,6 +143,8 @@ export function listenUniversalPayload(roomCode, uid, isHost, onPayloadReceived)
 
   return () => {
     isClosed = true;
+    try { unsubFirebaseMessages(); } catch (e) {}
+    try { unsubFirebaseHandshakes(); } catch (e) {}
     cleanupP2P();
     window.removeEventListener("storage", storageListener);
     clearInterval(pollNtfy);
