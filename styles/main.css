@@ -198,6 +198,58 @@
   gap: var(--space-md);
 }
 
+/* Iconic Brand Identity Styling */
+.connect-branding-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.brand-title-badge {
+  background: #ffffff;
+  padding: 18px 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 50px rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.brand-title-text {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: clamp(3.2rem, 7.5vw, 5.8rem);
+  font-weight: 800;
+  color: #000000;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-transform: lowercase;
+  margin: 0;
+}
+
+.brand-subtitle-badge {
+  background: #ffffff;
+  padding: 8px 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  max-width: 100%;
+}
+
+.brand-subtitle-badge span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.68rem, 1.5vw, 0.9rem);
+  font-weight: 700;
+  color: #000000;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .hero-badge {
   display: inline-flex;
   align-items: center;
