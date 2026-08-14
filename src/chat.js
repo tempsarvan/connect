@@ -17,7 +17,7 @@ let friendKey = localStorage.getItem("connect_friend_key") || generateFriendKey(
 
 let profileBio = localStorage.getItem("connect_profile_bio") || "Exploring Connect zero-trace communications suite.";
 let customStatus = localStorage.getItem("connect_custom_status") || "Online & Connected";
-let profileBannerColor = localStorage.getItem("connect_profile_banner") || "#1e293b";
+let profileBannerColor = localStorage.getItem("connect_profile_banner") || "linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)";
 let profileBadgeStyle = localStorage.getItem("connect_profile_badge") || "code";
 
 let connectedFriends = JSON.parse(localStorage.getItem("connect_friends_list") || '[]');

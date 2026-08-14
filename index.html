@@ -253,7 +253,7 @@
 
     <!-- SIMPLIFIED KEY TYPE SELECTION MODAL -->
     <div id="modal-select-key-type" class="auth-modal hidden">
-      <div class="auth-modal-card" style="max-width:500px;">
+      <div class="auth-modal-card">
         <button id="btn-close-key-modal" class="auth-close-btn">✕</button>
 
         <div class="auth-modal-header">
@@ -263,27 +263,27 @@
 
         <div class="key-selection-options-grid">
           <div id="btn-select-private-key" class="key-type-card">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <div>
-              <h3 style="font-size:1rem; font-weight:700; color:#ffffff;">Private Key</h3>
-              <p style="font-size:0.8rem; color:#94a3b8; margin-top:2px;">Single-use key. All messages and memory self-destruct upon session termination.</p>
+              <h3>Private Key</h3>
+              <p class="text-muted">Single-use key. All messages and memory self-destruct upon session termination.</p>
             </div>
           </div>
 
           <div id="btn-select-public-key" class="key-type-card">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
             <div>
-              <h3 style="font-size:1rem; font-weight:700; color:#ffffff;">Public Key</h3>
-              <p style="font-size:0.8rem; color:#94a3b8; margin-top:2px;">Community key saved to your Public Rooms Hub for future sessions.</p>
+              <h3>Public Key</h3>
+              <p class="text-muted">Community key saved to your Public Rooms Hub for future sessions.</p>
             </div>
           </div>
         </div>
 
         <!-- Public Room Name Inputs (Shown when Public selected) -->
-        <div id="modal-public-inputs-group" class="public-room-details-group hidden" style="margin-top:14px;">
+        <div id="modal-public-inputs-group" class="public-room-details-group hidden">
           <input id="input-modal-public-name" type="text" class="input-field" placeholder="Room Name (e.g. Lounge, Devs)" maxlength="30">
           <input id="input-modal-public-topic" type="text" class="input-field" placeholder="Topic / Description (Optional)" maxlength="80">
-          <button id="btn-confirm-public-key" class="btn btn-primary" style="height:44px; margin-top:6px;">Generate Public Key</button>
+          <button id="btn-confirm-public-key" class="btn btn-primary btn-modal-action">Generate Public Key</button>
         </div>
       </div>
     </div>
@@ -506,11 +506,11 @@
           <!-- 2. Instagram Native Client Window -->
           <div id="hub-win-instagram" class="hub-app-window hidden" data-app-id="instagram" style="width:400px; height:580px; top:60px; left:480px;">
             <div class="hub-window-titlebar"><div class="win-controls"><span class="win-btn win-btn-close"></span><span class="win-btn win-btn-min"></span><span class="win-btn win-btn-max"></span></div><span class="win-title">Instagram Web Client</span></div>
-            <div class="hub-window-body" style="padding:16px; background:#0d1117; color:#ffffff; overflow-y:auto;">
-              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;"><span style="font-weight:700;">Instagram Feed</span><span style="font-size:0.75rem; color:#94a3b8;">🟢 Connected</span></div>
-              <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); margin-bottom:10px;">
-                <span style="font-size:0.82rem; font-weight:700; color:#f472b6;">@connect_official</span>
-                <p style="font-size:0.8rem; margin-top:4px; color:#cbd5e1;">Zero-trace AES-GCM encrypted messaging suite & Web Desktop platform.</p>
+            <div class="hub-window-body">
+              <div class="hub-card-header"><span>Instagram Feed</span><span class="text-muted">🟢 Connected</span></div>
+              <div class="hub-card">
+                <span class="text-brand">@connect_official</span>
+                <p class="text-muted">Zero-trace AES-GCM encrypted messaging suite & Web Desktop platform.</p>
               </div>
             </div>
           </div>
@@ -518,9 +518,9 @@
           <!-- 3. Discord Native Client Window -->
           <div id="hub-win-discord" class="hub-app-window hidden" data-app-id="discord" style="width:460px; height:560px; top:80px; left:120px;">
             <div class="hub-window-titlebar"><div class="win-controls"><span class="win-btn win-btn-close"></span><span class="win-btn win-btn-min"></span><span class="win-btn win-btn-max"></span></div><span class="win-title">Discord Web Client</span></div>
-            <div class="hub-window-body" style="padding:16px; background:#090b10; color:#ffffff; overflow-y:auto;">
-              <div style="font-weight:700; margin-bottom:8px;"># general-chat</div>
-              <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; font-size:0.82rem; color:#cbd5e1;">Discord Web App Connected cleanly inside Connect Hub.</div>
+            <div class="hub-window-body">
+              <div class="hub-section-title"># general-chat</div>
+              <div class="hub-card text-muted">Discord Web App Connected cleanly inside Connect Hub.</div>
             </div>
           </div>
 
@@ -535,18 +535,18 @@
           <!-- 5. X (Twitter) Native Client Window -->
           <div id="hub-win-twitter" class="hub-app-window hidden" data-app-id="twitter" style="width:420px; height:540px; top:70px; left:200px;">
             <div class="hub-window-titlebar"><div class="win-controls"><span class="win-btn win-btn-close"></span><span class="win-btn win-btn-min"></span><span class="win-btn win-btn-max"></span></div><span class="win-title">X (Twitter) Client</span></div>
-            <div class="hub-window-body" style="padding:16px; background:#000000; color:#ffffff; overflow-y:auto;">
-              <div style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">X Trends for You</div>
-              <div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1); font-size:0.8rem; color:#94a3b8;">#ConnectMessenger • Trending</div>
+            <div class="hub-window-body">
+              <div class="hub-section-title">X Trends for You</div>
+              <div class="hub-trend-item text-muted">#ConnectMessenger • Trending</div>
             </div>
           </div>
 
           <!-- 6. GitHub Client Window -->
           <div id="hub-win-github" class="hub-app-window hidden" data-app-id="github" style="width:480px; height:520px; top:90px; left:350px;">
             <div class="hub-window-titlebar"><div class="win-controls"><span class="win-btn win-btn-close"></span><span class="win-btn win-btn-min"></span><span class="win-btn win-btn-max"></span></div><span class="win-title">GitHub Repository</span></div>
-            <div class="hub-window-body" style="padding:16px; background:#0d1117; color:#ffffff; overflow-y:auto;">
-              <div style="font-weight:700; font-family:var(--font-mono); font-size:0.9rem;">tempsarvan/connect</div>
-              <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">Zero-Trace Ephemeral Private Messaging & Connect Hub Web Desktop Platform.</p>
+            <div class="hub-window-body">
+              <div class="text-mono">tempsarvan/connect</div>
+              <p class="text-muted">Zero-Trace Ephemeral Private Messaging & Connect Hub Web Desktop Platform.</p>
             </div>
           </div>
 
@@ -775,15 +775,15 @@
 
     <!-- IDE Code Evaluator Console Modal -->
     <div id="modal-dev-editor" class="auth-modal hidden">
-      <div class="auth-modal-card" style="max-width:620px;">
+      <div class="auth-modal-card">
         <button id="btn-close-dev-editor" class="auth-close-btn">✕</button>
         <div class="auth-modal-header"><h2>IDE Code Evaluator Console</h2><p>Write, test, and execute JavaScript code snippets in real-time.</p></div>
         <div class="dev-editor-wrapper">
-          <textarea id="dev-code-input" class="input-field" style="font-family:var(--font-mono); height:160px; padding:12px; background:#06090e; color:#ffffff; border-color:rgba(255,255,255,0.2); resize:none;" spellcheck="false">// Write JavaScript snippet to execute
+          <textarea id="dev-code-input" class="input-field text-mono" spellcheck="false">// Write JavaScript snippet to execute
 const result = [1, 2, 3, 4].map(x => x * 2);
 console.log("Calculated:", result);
 return result;</textarea>
-          <pre id="dev-console-output" class="dev-console-output" style="font-family:var(--font-mono); font-size:0.82rem; padding:10px 14px; background:#0d1117; color:#ffffff; border:1px solid rgba(255,255,255,0.2); border-radius:8px; margin-top:10px; min-height:48px; white-space:pre-wrap;">> Ready for execution...</pre>
+          <pre id="dev-console-output" class="dev-console-output text-mono">> Ready for execution...</pre>
           <div style="display:flex; gap:10px; margin-top:14px;">
             <button id="btn-run-dev-code" class="btn btn-secondary" style="flex:1;">Run Code Snippet</button>
             <button id="btn-share-dev-code" class="btn btn-primary" style="flex:1;">Share Code in Chat</button>
@@ -794,7 +794,7 @@ return result;</textarea>
 
     <!-- Room Participants Modal -->
     <div id="modal-room-members" class="auth-modal hidden">
-      <div class="auth-modal-card" style="max-width:440px;">
+      <div class="auth-modal-card">
         <button id="btn-close-room-members" class="auth-close-btn">✕</button>
         <div class="auth-modal-header"><h2>Room Participants & Peers</h2><p>Real-time connected users in this room session.</p></div>
         <div id="room-members-list-container" class="friends-list-container"></div>
@@ -803,7 +803,7 @@ return result;</textarea>
 
     <!-- Invite Friends Modal -->
     <div id="modal-invite-friends" class="auth-modal hidden">
-      <div class="auth-modal-card" style="max-width:440px;">
+      <div class="auth-modal-card">
         <button id="btn-close-invite-friends" class="auth-close-btn">✕</button>
         <div class="auth-modal-header"><h2>Invite Friends to Room</h2><p>Send an instant room key invitation to your connected friends.</p></div>
         <div id="invite-friends-list-container" class="friends-list-container"></div>
@@ -814,7 +814,7 @@ return result;</textarea>
     <div id="modal-profile-card" class="auth-modal hidden">
       <div class="discord-profile-card">
         <button id="btn-close-profile-card" class="profile-card-close">✕</button>
-        <div id="profile-card-banner" class="profile-card-banner" style="background:#1e293b;"></div>
+        <div id="profile-card-banner" class="profile-card-banner"></div>
         <div class="profile-card-avatar-wrapper">
           <div id="profile-card-avatar" class="profile-card-avatar"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
           <span class="avatar-online-dot-lg"></span>
@@ -822,9 +822,9 @@ return result;</textarea>
         <div class="profile-card-body">
           <div class="profile-card-names"><h2 id="profile-card-handle">@username</h2><div id="profile-card-status" class="profile-card-status">Online & Connected</div></div>
           <div class="profile-card-divider"></div>
-          <div class="profile-card-section"><span class="profile-card-label">MY UNIQUE FRIEND KEY</span><div id="profile-card-friend-key" class="profile-card-date" style="font-family:var(--font-mono); font-weight:700; color:#ffffff; font-size:0.9rem;">CN-9X4A-82</div></div>
+          <div class="profile-card-section"><span class="profile-card-label">MY UNIQUE FRIEND KEY</span><div id="profile-card-friend-key" class="profile-card-date text-mono text-white">CN-9X4A-82</div></div>
           <div class="profile-card-section"><span class="profile-card-label">ABOUT ME</span><p id="profile-card-bio" class="profile-card-bio-text">Exploring Connect zero-trace communications suite.</p></div>
-          <button id="btn-edit-profile-from-card" class="btn btn-primary" style="width:100%; height:40px; margin-top:8px;"><span>Customize Profile</span></button>
+          <button id="btn-edit-profile-from-card" class="btn btn-primary btn-modal-action"><span>Customize Profile</span></button>
         </div>
       </div>
     </div>
@@ -852,29 +852,29 @@ return result;</textarea>
       <header class="fullscreen-settings-header"><div class="settings-title-group"><h2>Preferences & System Settings</h2><p>Customize your profile, typography, themes, and friend aliases.</p></div><button id="btn-close-fullscreen-settings" class="btn-icon">✕</button></header>
       <div class="fullscreen-settings-body">
         <div class="settings-section">
-          <h3 style="color:#ffffff;">CUSTOMIZE CONNECT</h3>
-          <div class="form-group"><label class="form-label">UI Typography Font</label><select id="setting-select-font" class="input-field" style="background:#090b10; color:#ffffff;"><option value="inter">Inter (Clean Modern Sans)</option><option value="jetbrains">JetBrains Mono (Developer Code Font)</option><option value="system">System Sans (Native OS Font)</option></select></div>
-          <div class="form-group"><label class="form-label">Cold Obsidian Grayscale Palette</label><select id="setting-select-grayscale" class="input-field" style="background:#090b10; color:#ffffff;"><option value="obsidian">Cold Obsidian Dark Slate</option><option value="monochrome">Pure Deep Monochrome Black</option><option value="charcoal">Cold Cyber Charcoal</option></select></div>
+          <h3>CUSTOMIZE CONNECT</h3>
+          <div class="form-group"><label class="form-label">UI Typography Font</label><select id="setting-select-font" class="input-field"><option value="inter">Inter (Clean Modern Sans)</option><option value="jetbrains">JetBrains Mono (Developer Code Font)</option><option value="system">System Sans (Native OS Font)</option></select></div>
+          <div class="form-group"><label class="form-label">Cold Obsidian Grayscale Palette</label><select id="setting-select-grayscale" class="input-field"><option value="obsidian">Cold Obsidian Dark Slate</option><option value="monochrome">Pure Deep Monochrome Black</option><option value="charcoal">Cold Cyber Charcoal</option></select></div>
         </div>
         <div class="settings-section">
           <h3>User Profile Credentials</h3>
           <div class="form-group"><label class="form-label">Locked Unique Handle</label><input id="setting-input-username" type="text" class="input-field" placeholder="@username" maxlength="20"></div>
           <div class="form-group"><label class="form-label">Private Passcode / PIN</label><input id="setting-input-password" type="password" class="input-field" placeholder="Secret PIN" maxlength="30"></div>
-          <div class="form-group"><label class="form-label">My Unique Friend Key</label><input id="setting-input-friend-key" type="text" class="input-field" style="font-family:var(--font-mono); color:#ffffff; font-weight:700;" readonly></div>
+          <div class="form-group"><label class="form-label">My Unique Friend Key</label><input id="setting-input-friend-key" type="text" class="input-field text-mono text-white" readonly></div>
         </div>
         <div class="settings-section">
           <h3>🔥 Firebase Cloud Infrastructure</h3>
-          <p style="font-size:0.78rem; color:#94a3b8; margin-bottom:10px;">Connect your production Firebase Cloud Firestore & Auth backend for zero-fail multi-device real-time sync.</p>
-          <div class="form-group"><label class="form-label">Firebase API Key</label><input id="setting-firebase-api-key" type="text" class="input-field" placeholder="AIzaSy..." style="font-family:var(--font-mono); font-size:0.8rem;"></div>
-          <div class="form-group"><label class="form-label">Firebase Project ID</label><input id="setting-firebase-project-id" type="text" class="input-field" placeholder="my-connect-app" style="font-family:var(--font-mono); font-size:0.8rem;"></div>
-          <div class="form-group"><label class="form-label">Firebase Auth Domain</label><input id="setting-firebase-auth-domain" type="text" class="input-field" placeholder="my-connect-app.firebaseapp.com" style="font-family:var(--font-mono); font-size:0.8rem;"></div>
-          <div class="form-group"><label class="form-label">Firebase App ID</label><input id="setting-firebase-app-id" type="text" class="input-field" placeholder="1:1234567890:web:abcdef" style="font-family:var(--font-mono); font-size:0.8rem;"></div>
+          <p class="text-muted" style="font-size:0.78rem; margin-bottom:10px;">Connect your production Firebase Cloud Firestore & Auth backend for zero-fail multi-device real-time sync.</p>
+          <div class="form-group"><label class="form-label">Firebase API Key</label><input id="setting-firebase-api-key" type="text" class="input-field text-mono" placeholder="AIzaSy..." style="font-size:0.8rem;"></div>
+          <div class="form-group"><label class="form-label">Firebase Project ID</label><input id="setting-firebase-project-id" type="text" class="input-field text-mono" placeholder="my-connect-app" style="font-size:0.8rem;"></div>
+          <div class="form-group"><label class="form-label">Firebase Auth Domain</label><input id="setting-firebase-auth-domain" type="text" class="input-field text-mono" placeholder="my-connect-app.firebaseapp.com" style="font-size:0.8rem;"></div>
+          <div class="form-group"><label class="form-label">Firebase App ID</label><input id="setting-firebase-app-id" type="text" class="input-field text-mono" placeholder="1:1234567890:web:abcdef" style="font-size:0.8rem;"></div>
         </div>
         <div class="settings-section">
           <h3>Zero-Trace Security Vault</h3>
           <div style="display:flex; gap:10px;"><button id="btn-export-vault" class="btn btn-secondary" style="flex:1;">Export Vault Backup</button><button id="btn-panic-wipe" class="btn btn-danger-text" style="flex:1; height:46px;">1-Click Panic Wipe</button></div>
         </div>
-        <div class="settings-footer-actions"><button id="btn-save-fullscreen-settings" class="btn btn-primary" style="width:100%; height:48px;">Apply & Save Preferences</button></div>
+        <div class="settings-footer-actions"><button id="btn-save-fullscreen-settings" class="btn btn-primary btn-modal-action" style="height:48px;">Apply & Save Preferences</button></div>
       </div>
     </div>
 
